@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no">
 <title>Block Blast!</title>
-<script src="/socket.io/socket.io.js"></script>
+<script src="/socket.io/socket.io.js" onerror="console.warn('socket.io not loaded - offline mode')"></script>
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Nunito:wght@600;700;800;900&display=swap');
 
@@ -545,6 +545,19 @@ html,body{width:100%;height:100%;overflow:hidden;background:var(--bg);}
 <input type="file" id="skinInput" accept="image/*" style="display:none" onchange="onSkinChange(event)">
 
 <script>
+// ── Canvas roundRect polyfill (for older browsers) ──
+if(!CanvasRenderingContext2D.prototype.roundRect){
+  CanvasRenderingContext2D.prototype.roundRect=function(x,y,w,h,r){
+    this.beginPath();this.moveTo(x+r,y);
+    this.lineTo(x+w-r,y);this.quadraticCurveTo(x+w,y,x+w,y+r);
+    this.lineTo(x+w,y+h-r);this.quadraticCurveTo(x+w,y+h,x+w-r,y+h);
+    this.lineTo(x+r,y+h);this.quadraticCurveTo(x,y+h,x,y+h-r);
+    this.lineTo(x,y+r);this.quadraticCurveTo(x,y,x+r,y);this.closePath();
+    return this;
+  };
+}
+// io stub so code doesn't crash if socket.io not loaded
+if(typeof io==='undefined'){window.io=()=>({on:()=>{},emit:()=>{},id:null});}
 // ══════════════════════════════════════════════════════
 //  STORAGE — everything persists in localStorage
 // ══════════════════════════════════════════════════════
@@ -891,7 +904,8 @@ let roomPlayers = [];
 
 function initSocket(){
   if(socket) return;
-  socket = io();
+  try{ socket=io(); } catch(e){ showToast('Sunucuya bağlanılamadı!'); return; }
+  if(!socket.on){ showToast('Sunucu çevrimdışı!'); socket=null; return; }
 
   socket.on('room_update', data=>{
     roomPlayers=data.players;
@@ -1001,7 +1015,12 @@ function startRoomGame(){
 // ══════════════════════════════════════════════════════
 //  START GAME ENTRY POINTS
 // ══════════════════════════════════════════════════════
+let game = null;          // declared here so socket handlers above can reference it
 let currentLevelDef = null;
+
+function openLevelSelect(){
+  showScreen('levelScreen');
+}
 
 function startLevel(ld){
   currentLevelDef=ld;
@@ -1013,8 +1032,6 @@ function retryLevel(){
   if(currentLevelDef) startLevel(currentLevelDef);
   else showScreen('homeScreen');
 }
-
-let game = null;
 
 function startGame(opts){
   showScreen('gameScreen');
@@ -1402,7 +1419,7 @@ class BlockBlastGame {
     this.blasting=[];
     set.forEach(k=>this.blasting.push({r:Math.floor(k/this.gridSize),c:k%this.gridSize,t:0}));
     const lines=rows.length+cols.length;
-    let pts=blasting_length_hack(set.size,lines);
+    let pts=set.size*10+(lines>=2?lines*50:0);
     this.streak=Math.min(this.streak+1,5);
     if(this.streak>=2)pts=Math.round(pts*(1+(this.streak-1)*0.1));
     if(lines>=2){
@@ -1672,13 +1689,6 @@ class BlockBlastGame {
     ctx.lineTo(x+r,y+h);ctx.quadraticCurveTo(x,y+h,x,y+h-r);
     ctx.lineTo(x,y+r);ctx.quadraticCurveTo(x,y,x+r,y);ctx.closePath();
   }
-}
-
-// Helper needed by _triggerClear scope
-function blasting_length_hack(cells,lines){
-  let pts=cells*10;
-  if(lines>=2)pts+=lines*50;
-  return pts;
 }
 
 // ══════════════════════════════════════════════════════
