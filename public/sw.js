@@ -1,26 +1,79 @@
-const CACHE_NAME='birlikte-izle-v1';
-self.addEventListener('install',e=>{ self.skipWaiting(); });
-self.addEventListener('activate',e=>{ e.waitUntil(self.clients.claim()); });
-self.addEventListener('push',e=>{
-    if(!e.data)return;
-    const d=e.data.json();
-    e.waitUntil(self.registration.showNotification(d.title||'Birlikte İzle',{
-        body:d.body||'Yeni bildirim',icon:'/icon-192.png',badge:'/badge-72.png',
-        vibrate:[200,100,200],data:d.data||{},requireInteraction:true,
-        actions:[{action:'open',title:'Aç'},{action:'close',title:'Kapat'}]
-    }));
+// Service Worker v1.0 - Push Bildirimleri için
+
+self.addEventListener('install', (event) => {
+    console.log('✅ Service Worker kuruldu');
+    self.skipWaiting();
 });
-self.addEventListener('notificationclick',e=>{
-    e.notification.close();
-    if(e.action==='open'||!e.action){
-        const d=e.notification.data;
-        if(d.type==='room-invite'&&d.roomCode){
-            e.waitUntil(clients.matchAll({type:'window',includeUncontrolled:true}).then(cs=>{
-                for(const c of cs){ if('focus'in c){ c.focus(); c.postMessage({type:'room-invite-notification-click',roomCode:d.roomCode,inviteId:d.inviteId}); return; } }
-                if(clients.openWindow) return clients.openWindow(`/?room=${d.roomCode}&invite=${d.inviteId}`);
-            }));
-        }else{
-            e.waitUntil(clients.matchAll({type:'window'}).then(cs=>cs.length>0?cs[0].focus():clients.openWindow('/')));
-        }
+
+self.addEventListener('activate', (event) => {
+    console.log('✅ Service Worker aktif');
+    event.waitUntil(clients.claim());
+});
+
+self.addEventListener('push', function(event) {
+    console.log('📨 Push bildirimi alındı');
+    
+    let data = {};
+    
+    try {
+        data = event.data.json();
+    } catch (e) {
+        data = {
+            title: 'Birlikte İzle',
+            body: event.data.text(),
+            icon: '/icon.png',
+            badge: '/badge.png'
+        };
     }
+    
+    const options = {
+        body: data.body || 'Bir davetin var!',
+        icon: data.icon || 'https://ik.imagekit.io/5v8xlfyfa/icon.png',
+        badge: data.badge || 'https://ik.imagekit.io/5v8xlfyfa/badge.png',
+        vibrate: [200, 100, 200],
+        data: data.data || {},
+        actions: data.actions || [
+            { action: 'open', title: 'Odaya Git' },
+            { action: 'close', title: 'Kapat' }
+        ],
+        tag: 'birlikte-izle',
+        renotify: true,
+        requireInteraction: true,
+        silent: false
+    };
+    
+    event.waitUntil(
+        self.registration.showNotification(
+            data.title || '📱 Birlikte İzle',
+            options
+        )
+    );
+});
+
+self.addEventListener('notificationclick', function(event) {
+    console.log('🔔 Bildirime tıklandı:', event.action);
+    
+    event.notification.close();
+    
+    if (event.action === 'open') {
+        const urlToOpen = event.notification.data?.url || '/';
+        
+        event.waitUntil(
+            clients.matchAll({
+                type: 'window',
+                includeUncontrolled: true
+            }).then((clientList) => {
+                for (const client of clientList) {
+                    if (client.url === urlToOpen && 'focus' in client) {
+                        return client.focus();
+                    }
+                }
+                return clients.openWindow(urlToOpen);
+            })
+        );
+    }
+});
+
+self.addEventListener('notificationclose', function(event) {
+    console.log('❌ Bildirim kapatıldı');
 });
