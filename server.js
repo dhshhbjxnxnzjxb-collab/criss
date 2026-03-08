@@ -43,9 +43,10 @@ const roomVideos = new Map();            // Oda içi videolar (geçici)
 const deviceRelations = new Map();       // Device ID ilişkileri
 const pushSubscriptions = new Map();     // Bildirim abonelikleri
 const userProfiles = new Map();          // Kullanıcı profilleri (deviceId -> profile)
+const userSessions = new Map();          // Oturum bilgileri
 
-// 👑 ADMIN IP
-const ADMIN_IP = '151.250.12.70'; // Kendi IP'nle değiştir
+// 👑 ADMIN IP (Kendi IP'nle değiştir)
+const ADMIN_IP = '151.250.12.70';
 
 // 🔄 Self-ping (Render uyku engelleme)
 setInterval(() => {
@@ -62,17 +63,18 @@ setInterval(() => {
 // 🧹 Temizlik işleri (her saat)
 const cleanupJob = new CronJob('0 * * * *', () => {
     console.log('🧹 Temizlik başladı...');
-    
-    // Video kütüphanesi temizliği
     const now = Date.now();
+    
+    // Video kütüphanesi temizliği (admin videoları - 7 gün)
     videoLibrary.forEach((video, id) => {
         if (video.expiresAt < now) {
             imagekit.deleteFile(video.fileId, () => {});
             videoLibrary.delete(id);
+            console.log(`📚 Kütüphane videosu silindi: ${video.title}`);
         }
     });
     
-    // Oda videoları temizliği
+    // Oda videoları temizliği (24 saat)
     roomVideos.forEach((video, id) => {
         if (video.expiresAt < now) {
             imagekit.deleteFile(video.fileId, () => {});
@@ -80,14 +82,25 @@ const cleanupJob = new CronJob('0 * * * *', () => {
         }
     });
     
-    // Eski bildirim aboneliklerini temizle
+    // Eski bildirim aboneliklerini temizle (30 gün)
     pushSubscriptions.forEach((sub, deviceId) => {
         if (sub.expiresAt < now) {
             pushSubscriptions.delete(deviceId);
         }
     });
     
-    console.log(`✅ Temizlik tamamlandı`);
+    // Boş odaları temizle (1 saat)
+    rooms.forEach((room, code) => {
+        if (room.users.size === 0 && (now - room.lastActivity) > 60 * 60 * 1000) {
+            rooms.delete(code);
+            messages.delete(code);
+            userStickers.delete(code);
+            securePhotos.delete(code);
+            console.log(`🧹 Boş oda silindi: ${code}`);
+        }
+    });
+    
+    console.log(`✅ Temizlik tamamlandı - Kütüphane: ${videoLibrary.size} video`);
 });
 
 cleanupJob.start();
@@ -127,7 +140,7 @@ function generateRoomCode() {
 }
 
 function generateUserColor(username) {
-    const colors = ['#405DE6', '#5851DB', '#833AB4', '#C13584', '#E1306C', '#FD1D1D'];
+    const colors = ['#405DE6', '#5851DB', '#833AB4', '#C13584', '#E1306C', '#FD1D1D', '#F56040', '#F77737', '#FCAF45', '#FFDC80'];
     const index = username ? username.split('').reduce((acc, c) => acc + c.charCodeAt(0), 0) : 0;
     return colors[index % colors.length];
 }
@@ -152,6 +165,7 @@ function getLibraryList() {
             title: video.title,
             url: video.url,
             thumbnail: video.thumbnail,
+            uploadedBy: video.uploadedBy,
             uploadedAt: video.uploadedAt,
             timeRemaining: Math.max(0, Math.floor((video.expiresAt - Date.now()) / 1000))
         });
@@ -159,12 +173,47 @@ function getLibraryList() {
     return list.sort((a, b) => b.uploadedAt - a.uploadedAt);
 }
 
+function updateUserList(roomCode) {
+    const room = rooms.get(roomCode);
+    if (!room) return;
+    
+    const userList = Array.from(room.users.values()).map(user => ({
+        id: user.id,
+        deviceId: user.deviceId,
+        userName: user.userName,
+        userPhoto: user.userPhoto,
+        userColor: user.userColor,
+        isOwner: user.isOwner,
+        isAdmin: user.isAdmin || false
+    }));
+    
+    io.to(roomCode).emit('user-list-update', userList);
+}
+
+function recordInteraction(deviceId1, deviceId2) {
+    if (!deviceId1 || !deviceId2 || deviceId1 === deviceId2) return;
+    
+    const profile1 = userProfiles.get(deviceId1);
+    const profile2 = userProfiles.get(deviceId2);
+    
+    if (profile1) profile1.interactions.add(deviceId2);
+    if (profile2) profile2.interactions.add(deviceId1);
+    
+    const key = [deviceId1, deviceId2].sort().join(':');
+    deviceRelations.set(key, {
+        deviceIds: [deviceId1, deviceId2],
+        lastInteraction: Date.now(),
+        count: (deviceRelations.get(key)?.count || 0) + 1
+    });
+}
+
 // 📡 Socket.io
 const io = socketIo(server, {
     cors: { origin: "*", methods: ["GET", "POST"] },
     transports: ['websocket', 'polling'],
     maxHttpBufferSize: 5 * 1024 * 1024 * 1024,
-    pingTimeout: 120000
+    pingTimeout: 120000,
+    pingInterval: 25000
 });
 
 io.on('connection', (socket) => {
@@ -175,16 +224,26 @@ io.on('connection', (socket) => {
     if (forwardedFor) clientIp = forwardedFor.split(',')[0].trim();
     
     const isAdmin = clientIp === ADMIN_IP;
+    if (isAdmin) console.log('👑 Admin girişi yapıldı!');
+    
     let currentUser = null;
     let currentRoomCode = null;
     let currentDeviceId = null;
+
+    // Ping-Pong
+    const pingInterval = setInterval(() => {
+        if (socket.connected) {
+            socket.emit('ping', { timestamp: Date.now() });
+        }
+    }, 25000);
+
+    socket.on('pong', (data) => {});
 
     // 📱 Device ID kaydı
     socket.on('register-device', (data) => {
         const { deviceId, userName, userPhoto } = data;
         currentDeviceId = deviceId;
         
-        // Profil kaydet
         if (!userProfiles.has(deviceId)) {
             userProfiles.set(deviceId, {
                 deviceId,
@@ -192,7 +251,7 @@ io.on('connection', (socket) => {
                 userPhoto: userPhoto || generateDefaultAvatar(userName),
                 firstSeen: Date.now(),
                 lastSeen: Date.now(),
-                interactions: new Set() // Etkileşim kurulan deviceId'ler
+                interactions: new Set()
             });
         } else {
             const profile = userProfiles.get(deviceId);
@@ -209,28 +268,9 @@ io.on('connection', (socket) => {
         const { deviceId, subscription } = data;
         pushSubscriptions.set(deviceId, {
             subscription,
-            expiresAt: Date.now() + (30 * 24 * 60 * 60 * 1000) // 30 gün
+            expiresAt: Date.now() + (30 * 24 * 60 * 60 * 1000)
         });
     });
-
-    // 👥 Etkileşim kaydet
-    function recordInteraction(deviceId1, deviceId2) {
-        if (!deviceId1 || !deviceId2 || deviceId1 === deviceId2) return;
-        
-        const profile1 = userProfiles.get(deviceId1);
-        const profile2 = userProfiles.get(deviceId2);
-        
-        if (profile1) profile1.interactions.add(deviceId2);
-        if (profile2) profile2.interactions.add(deviceId1);
-        
-        // Device relations'a ekle
-        const key = [deviceId1, deviceId2].sort().join(':');
-        deviceRelations.set(key, {
-            deviceIds: [deviceId1, deviceId2],
-            lastInteraction: Date.now(),
-            count: (deviceRelations.get(key)?.count || 0) + 1
-        });
-    }
 
     // 📨 Davet gönder
     socket.on('send-invite', async (data) => {
@@ -285,7 +325,6 @@ io.on('connection', (socket) => {
             }
         });
         
-        // Son etkileşime göre sırala
         interactions.sort((a, b) => b.lastSeen - a.lastSeen);
         socket.emit('interactions-list', interactions);
     });
@@ -321,6 +360,11 @@ io.on('connection', (socket) => {
             video: null,
             videoVisible: true,
             theme: 'dark',
+            playbackState: {
+                playing: false,
+                currentTime: 0,
+                playbackRate: 1
+            },
             createdAt: Date.now(),
             lastActivity: Date.now()
         };
@@ -330,14 +374,28 @@ io.on('connection', (socket) => {
         currentRoomCode = roomCode;
         socket.join(roomCode);
         
+        userSessions.set(currentUser.id, {
+            roomCode: roomCode,
+            userName: userName,
+            userPhoto: currentUser.userPhoto,
+            isAdmin: isAdmin,
+            lastSeen: Date.now()
+        });
+        
+        const shareableLink = `${process.env.RENDER_EXTERNAL_URL || `http://localhost:${PORT}`}?room=${roomCode}`;
+        
         socket.emit('room-created', {
             roomCode,
             roomName,
             isOwner: true,
-            isAdmin
+            isAdmin,
+            shareableLink
         });
         
         socket.emit('video-library-list', getLibraryList());
+        updateUserList(roomCode);
+        
+        console.log(`✅ Oda oluşturuldu: ${roomCode} - Sahip: ${userName}`);
     });
 
     // 🚪 Odaya katıl
@@ -369,6 +427,7 @@ io.on('connection', (socket) => {
         users.set(socket.id, { ...currentUser, roomCode });
         currentRoomCode = roomCode;
         socket.join(roomCode);
+        room.lastActivity = Date.now();
         
         // Oda sahibiyle etkileşim kaydet
         const owner = Array.from(room.users.values()).find(u => u.isOwner);
@@ -377,6 +436,7 @@ io.on('connection', (socket) => {
         }
         
         const roomMessages = messages.get(roomCode) || [];
+        const roomStickers = userStickers.get(roomCode) || [];
         
         socket.emit('room-joined', {
             roomCode: room.code,
@@ -386,7 +446,9 @@ io.on('connection', (socket) => {
             previousMessages: roomMessages.slice(-50),
             activeVideo: room.video,
             videoVisible: room.videoVisible,
-            theme: room.theme
+            theme: room.theme,
+            playbackState: room.playbackState,
+            stickers: roomStickers
         });
         
         socket.emit('video-library-list', getLibraryList());
@@ -394,6 +456,46 @@ io.on('connection', (socket) => {
         socket.to(roomCode).emit('user-joined', {
             userName: currentUser.userName
         });
+        
+        updateUserList(roomCode);
+        
+        console.log(`✅ Kullanıcı katıldı: ${userName} -> ${roomCode}`);
+    });
+
+    // Oturum kurtarma
+    socket.on('recover-session', (data) => {
+        const { userId } = data;
+        const session = userSessions.get(userId);
+        
+        if (session && session.roomCode) {
+            const room = rooms.get(session.roomCode);
+            if (room) {
+                currentUser = {
+                    id: socket.id,
+                    deviceId: session.deviceId,
+                    userName: session.userName,
+                    userPhoto: session.userPhoto,
+                    userColor: generateUserColor(session.userName),
+                    isOwner: room.owner === session.userId,
+                    isAdmin: session.isAdmin
+                };
+                
+                room.users.set(socket.id, currentUser);
+                users.set(socket.id, { ...currentUser, roomCode: session.roomCode });
+                currentRoomCode = session.roomCode;
+                socket.join(session.roomCode);
+                
+                socket.emit('session-recovered', {
+                    roomCode: room.code,
+                    roomName: room.name,
+                    isOwner: room.owner === socket.id,
+                    isAdmin: currentUser.isAdmin
+                });
+                
+                updateUserList(session.roomCode);
+                console.log(`🔄 Oturum kurtarıldı: ${session.userName}`);
+            }
+        }
     });
 
     // 💬 Mesaj gönder
@@ -401,7 +503,7 @@ io.on('connection', (socket) => {
         if (!currentRoomCode || !currentUser) return;
         
         const message = {
-            id: Date.now().toString() + Math.random().toString(36).substr(2, 5),
+            id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
             userName: currentUser.userName,
             userPhoto: currentUser.userPhoto,
             userColor: currentUser.userColor,
@@ -412,12 +514,22 @@ io.on('connection', (socket) => {
             fileName: messageData.fileName,
             fileSize: messageData.fileSize,
             reactions: [],
-            replyTo: messageData.replyTo || null, // Yanıtlanan mesaj ID'si
+            replyTo: messageData.replyTo || null,
             isSecure: messageData.isSecure || false,
             secureId: messageData.secureId || null,
             time: new Date().toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' }),
             timestamp: Date.now()
         };
+        
+        if (message.isSecure && message.secureId) {
+            const roomSecurePhotos = securePhotos.get(currentRoomCode) || [];
+            roomSecurePhotos.push({
+                id: message.secureId,
+                imageUrl: message.fileUrl,
+                expiresAt: Date.now() + 8000
+            });
+            securePhotos.set(currentRoomCode, roomSecurePhotos);
+        }
         
         const roomMessages = messages.get(currentRoomCode) || [];
         roomMessages.push(message);
@@ -435,10 +547,10 @@ io.on('connection', (socket) => {
     socket.on('reply-message', (data) => {
         if (!currentRoomCode || !currentUser) return;
         
-        const { replyToId, text, type, fileUrl } = data;
+        const { replyToId, text, type, fileUrl, isSecure, secureId } = data;
         
         const message = {
-            id: Date.now().toString() + Math.random().toString(36).substr(2, 5),
+            id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
             userName: currentUser.userName,
             userPhoto: currentUser.userPhoto,
             userColor: currentUser.userColor,
@@ -448,9 +560,21 @@ io.on('connection', (socket) => {
             fileUrl: fileUrl,
             replyTo: replyToId,
             reactions: [],
+            isSecure: isSecure || false,
+            secureId: secureId || null,
             time: new Date().toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' }),
             timestamp: Date.now()
         };
+        
+        if (message.isSecure && message.secureId) {
+            const roomSecurePhotos = securePhotos.get(currentRoomCode) || [];
+            roomSecurePhotos.push({
+                id: message.secureId,
+                imageUrl: message.fileUrl,
+                expiresAt: Date.now() + 8000
+            });
+            securePhotos.set(currentRoomCode, roomSecurePhotos);
+        }
         
         const roomMessages = messages.get(currentRoomCode) || [];
         roomMessages.push(message);
@@ -483,15 +607,13 @@ io.on('connection', (socket) => {
         const photo = roomSecurePhotos.find(p => p.id === secureId);
         
         if (photo) {
-            // 8 saniye görüntüleme
             io.to(currentRoomCode).emit('secure-photo-view', {
                 secureId: secureId,
                 imageUrl: photo.imageUrl,
                 viewerName: currentUser.userName,
-                expiresAt: Date.now() + 8000 // 8 saniye
+                expiresAt: Date.now() + 8000
             });
             
-            // 8 saniye sonra mesajı sil
             setTimeout(() => {
                 const roomMessages = messages.get(currentRoomCode) || [];
                 const msgIndex = roomMessages.findIndex(m => m.secureId === secureId);
@@ -501,6 +623,12 @@ io.on('connection', (socket) => {
                     io.to(currentRoomCode).emit('message-deleted', { 
                         messageId: roomMessages[msgIndex]?.id 
                     });
+                }
+                
+                const photoIndex = roomSecurePhotos.findIndex(p => p.id === secureId);
+                if (photoIndex !== -1) {
+                    roomSecurePhotos.splice(photoIndex, 1);
+                    securePhotos.set(currentRoomCode, roomSecurePhotos);
                 }
             }, 8000);
         }
@@ -522,7 +650,7 @@ io.on('connection', (socket) => {
                 title,
                 uploadedBy: currentUser.userName,
                 uploadedAt: Date.now(),
-                expiresAt: Date.now() + (24 * 60 * 60 * 1000), // 24 saat
+                expiresAt: Date.now() + (24 * 60 * 60 * 1000),
                 roomCode: currentRoomCode
             });
             
@@ -534,6 +662,7 @@ io.on('connection', (socket) => {
                 uploadedBy: currentUser.userName,
                 isRoomOnly: true
             };
+            room.lastActivity = Date.now();
             
             io.to(currentRoomCode).emit('video-uploaded', {
                 videoUrl: url,
@@ -564,12 +693,15 @@ io.on('connection', (socket) => {
                     fromLibrary: true,
                     isCopyrightFree: true
                 };
+                room.lastActivity = Date.now();
                 
                 io.to(currentRoomCode).emit('video-uploaded', {
                     videoUrl: film.url,
                     title: film.title,
                     fromLibrary: true
                 });
+            } else {
+                socket.emit('error', { message: 'Film yansıtmak için oda sahibi olmalısınız!' });
             }
         } else {
             socket.emit('play-pip-video', {
@@ -599,6 +731,7 @@ io.on('connection', (socket) => {
                 url: youtubeUrl,
                 title: title || 'YouTube Video'
             };
+            room.lastActivity = Date.now();
             
             io.to(currentRoomCode).emit('youtube-video-shared', {
                 videoId,
@@ -610,12 +743,23 @@ io.on('connection', (socket) => {
     // 🎮 Video kontrol
     socket.on('video-control', (controlData) => {
         if (!currentRoomCode || !currentUser || !currentUser.isOwner) return;
+        
+        const room = rooms.get(currentRoomCode);
+        if (room) {
+            room.playbackState = controlData;
+            room.lastActivity = Date.now();
+        }
+        
         socket.to(currentRoomCode).emit('video-control', controlData);
     });
 
     // 🎮 YouTube kontrol
     socket.on('youtube-control', (controlData) => {
         if (!currentRoomCode || !currentUser || !currentUser.isOwner) return;
+        
+        const room = rooms.get(currentRoomCode);
+        if (room) room.lastActivity = Date.now();
+        
         socket.to(currentRoomCode).emit('youtube-control', controlData);
     });
 
@@ -625,7 +769,13 @@ io.on('connection', (socket) => {
         
         const room = rooms.get(currentRoomCode);
         if (room) {
+            if (room.video && room.video.fileId && !room.video.fromLibrary) {
+                imagekit.deleteFile(room.video.fileId, () => {});
+            }
             room.video = null;
+            room.playbackState = { playing: false, currentTime: 0, playbackRate: 1 };
+            room.lastActivity = Date.now();
+            
             io.to(currentRoomCode).emit('video-deleted');
         }
     });
@@ -637,6 +787,8 @@ io.on('connection', (socket) => {
         const room = rooms.get(currentRoomCode);
         if (room) {
             room.videoVisible = !room.videoVisible;
+            room.lastActivity = Date.now();
+            
             io.to(currentRoomCode).emit('video-visibility-changed', {
                 visible: room.videoVisible
             });
@@ -649,6 +801,7 @@ io.on('connection', (socket) => {
         const room = rooms.get(currentRoomCode);
         if (room) {
             room.theme = theme;
+            room.lastActivity = Date.now();
             io.to(currentRoomCode).emit('theme-changed', theme);
         }
     });
@@ -662,7 +815,7 @@ io.on('connection', (socket) => {
         
         stickers.forEach(sticker => {
             roomStickers.push({
-                id: Date.now().toString() + Math.random().toString(36).substr(2, 5),
+                id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
                 imageUrl: sticker.imageUrl,
                 createdBy: currentUser.userName,
                 createdAt: Date.now()
@@ -682,7 +835,7 @@ io.on('connection', (socket) => {
         const { stickerId, imageUrl } = data;
         
         const message = {
-            id: Date.now().toString() + Math.random().toString(36).substr(2, 5),
+            id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
             userName: currentUser.userName,
             userPhoto: currentUser.userPhoto,
             userColor: currentUser.userColor,
@@ -710,19 +863,21 @@ io.on('connection', (socket) => {
             userName: currentUser?.userName
         });
         
-        // Odayı temizle
         const room = rooms.get(currentRoomCode);
         if (room) {
             rooms.delete(currentRoomCode);
             messages.delete(currentRoomCode);
             userStickers.delete(currentRoomCode);
             securePhotos.delete(currentRoomCode);
+            console.log(`🚨 Acil durum - oda silindi: ${currentRoomCode}`);
         }
     });
 
     // 🔌 Bağlantı kesildi
     socket.on('disconnect', () => {
         console.log('🔌 Bağlantı koptu:', socket.id);
+        
+        clearInterval(pingInterval);
         
         if (currentRoomCode && currentUser) {
             const room = rooms.get(currentRoomCode);
@@ -734,12 +889,14 @@ io.on('connection', (socket) => {
                     userName: currentUser.userName
                 });
                 
-                // Oda boşsa 1 saat sonra sil
+                updateUserList(currentRoomCode);
+                
                 if (room.users.size === 0) {
-                    setTimeout(() => {
+                    room.timeout = setTimeout(() => {
                         if (room.users.size === 0) {
                             rooms.delete(currentRoomCode);
                             messages.delete(currentRoomCode);
+                            console.log(`⏰ Boş oda silindi: ${currentRoomCode}`);
                         }
                     }, 60 * 60 * 1000);
                 }
@@ -753,6 +910,12 @@ io.on('connection', (socket) => {
 // ImageKit auth
 app.get('/api/imagekit-auth', (req, res) => {
     try {
+        const imagekit = new ImageKit({
+            publicKey: process.env.IMAGEKIT_PUBLIC_KEY || 'public_mfwvdT7bS9kxwL5YpRv5YY9/W4Q=',
+            privateKey: process.env.IMAGEKIT_PRIVATE_KEY || 'private_jgXy2tt8CCzfQoR6bN3y/KfWjtE=',
+            urlEndpoint: process.env.IMAGEKIT_URL_ENDPOINT || 'https://ik.imagekit.io/5v8xlfyfa'
+        });
+        
         const authParams = imagekit.getAuthenticationParameters();
         res.json(authParams);
     } catch (error) {
@@ -776,37 +939,52 @@ app.post('/api/library/upload', upload.single('video'), async (req, res) => {
         const { title } = req.body;
         const file = req.file;
         
+        if (!file) {
+            return res.status(400).json({ error: 'Video dosyası gerekli' });
+        }
+        
+        console.log(`📤 Admin video yükleniyor: ${title} - ${file.size} bytes`);
+        
         const result = await new Promise((resolve, reject) => {
             imagekit.upload({
                 file: file.buffer,
                 fileName: file.originalname,
                 folder: '/library_videos',
-                tags: ['library', 'copyright-free'],
-                useUniqueFileName: true
+                tags: ['library', 'copyright-free', 'admin'],
+                useUniqueFileName: true,
+                responseFields: ['fileId', 'name', 'url', 'thumbnail', 'size']
             }, (error, result) => {
                 if (error) reject(error);
                 else resolve(result);
             });
         });
         
-        const videoId = 'lib_' + Date.now();
+        const videoId = 'lib_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5);
+        const expiresAt = Date.now() + (7 * 24 * 60 * 60 * 1000); // 7 gün
+        
         videoLibrary.set(videoId, {
             id: videoId,
             title: title || file.originalname,
             url: result.url,
             fileId: result.fileId,
+            fileName: result.name,
+            thumbnail: result.thumbnail,
             uploadedBy: 'Admin',
             uploadedAt: Date.now(),
-            expiresAt: Date.now() + (7 * 24 * 60 * 60 * 1000),
-            thumbnail: result.thumbnail
+            expiresAt: expiresAt,
+            size: result.size
         });
+        
+        console.log(`✅ Kütüphaneye eklendi: ${title}`);
         
         res.json({ 
             success: true, 
+            message: 'Video kütüphaneye eklendi',
             library: getLibraryList()
         });
         
     } catch (error) {
+        console.error('❌ Kütüphane yükleme hatası:', error);
         res.status(500).json({ error: error.message });
     }
 });
@@ -816,14 +994,113 @@ app.get('/api/library', (req, res) => {
     res.json(getLibraryList());
 });
 
+// Oda bilgisi
+app.get('/api/room/:code', (req, res) => {
+    try {
+        const room = rooms.get(req.params.code);
+        if (!room) {
+            return res.status(404).json({ error: 'Oda bulunamadı' });
+        }
+        
+        res.json({
+            code: room.code,
+            name: room.name,
+            userCount: room.users.size,
+            createdAt: room.createdAt,
+            lastActivity: room.lastActivity,
+            hasPassword: !!room.password,
+            joinUrl: `${process.env.RENDER_EXTERNAL_URL || `http://localhost:${PORT}`}?room=${room.code}`
+        });
+    } catch (error) {
+        res.status(500).json({ error: 'Oda bilgisi alınamadı' });
+    }
+});
+
 // Health check
 app.get('/api/health', (req, res) => {
     res.json({ 
         status: 'OK', 
+        timestamp: new Date().toISOString(),
+        uptime: process.uptime(),
         rooms: rooms.size,
         users: users.size,
-        library: videoLibrary.size
+        library: videoLibrary.size,
+        messages: Array.from(messages.values()).reduce((acc, msgs) => acc + msgs.length, 0),
+        stickers: Array.from(userStickers.values()).reduce((acc, s) => acc + s.length, 0),
+        profiles: userProfiles.size,
+        subscriptions: pushSubscriptions.size,
+        adminIp: ADMIN_IP,
+        clientIp: req.headers['x-forwarded-for'] || req.socket.remoteAddress
     });
+});
+
+// İstatistikler (admin only)
+app.get('/api/stats', (req, res) => {
+    const clientIp = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
+    if (clientIp !== ADMIN_IP) {
+        return res.status(403).json({ error: 'Yetkisiz erişim' });
+    }
+    
+    const stats = {
+        rooms: [],
+        users: [],
+        library: getLibraryList(),
+        profiles: []
+    };
+    
+    rooms.forEach((room, code) => {
+        stats.rooms.push({
+            code,
+            name: room.name,
+            userCount: room.users.size,
+            users: Array.from(room.users.values()).map(u => u.userName),
+            createdAt: room.createdAt,
+            lastActivity: room.lastActivity
+        });
+    });
+    
+    userProfiles.forEach((profile, deviceId) => {
+        stats.profiles.push({
+            deviceId,
+            userName: profile.userName,
+            firstSeen: profile.firstSeen,
+            lastSeen: profile.lastSeen,
+            interactionCount: profile.interactions.size
+        });
+    });
+    
+    res.json(stats);
+});
+
+// Video sil (admin only)
+app.delete('/api/library/:id', async (req, res) => {
+    try {
+        const clientIp = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
+        if (clientIp !== ADMIN_IP) {
+            return res.status(403).json({ error: 'Sadece admin silebilir' });
+        }
+        
+        const { id } = req.params;
+        const video = videoLibrary.get(id);
+        
+        if (!video) {
+            return res.status(404).json({ error: 'Video bulunamadı' });
+        }
+        
+        await new Promise((resolve, reject) => {
+            imagekit.deleteFile(video.fileId, (error, result) => {
+                if (error) reject(error);
+                else resolve(result);
+            });
+        });
+        
+        videoLibrary.delete(id);
+        
+        res.json({ success: true, message: 'Video silindi' });
+        
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
 });
 
 // Ana sayfa
@@ -831,13 +1108,26 @@ app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
+// Service worker
+app.get('/sw.js', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'sw.js'));
+});
+
+// Catch-all
 app.get('*', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
 // 🚀 Server başlat
 server.listen(PORT, '0.0.0.0', () => {
-    console.log(`🚀 Server ${PORT} portunda çalışıyor`);
+    console.log('\n' + '='.repeat(50));
+    console.log(`🚀 SERVER ${PORT} PORTUNDA ÇALIŞIYOR`);
+    console.log('='.repeat(50));
+    console.log(`📱 Birlikte İzle Platformu v5.0`);
     console.log(`👑 Admin IP: ${ADMIN_IP}`);
-    console.log(`📚 Kütüphane: ${videoLibrary.size} video`);
+    console.log(`📚 Video Kütüphanesi: ${videoLibrary.size} video`);
+    console.log(`🔔 Bildirim Sistemi: Aktif`);
+    console.log(`💾 ImageKit: 5GB Destekli`);
+    console.log(`🧹 Otomatik Temizlik: Her saat`);
+    console.log('='.repeat(50));
 });
