@@ -3070,57 +3070,73 @@
                 };
             }
 
-            async uploadVideo(file) {
-                if (!file || !this.isOwner) {
-                    this.showError('Video yüklemek için oda sahibi olmalısın!');
-                    return;
-                }
-                
-                if (!file.type.startsWith('video/')) {
-                    this.showError('Video dosyası seç!');
-                    return;
-                }
-                
-                this.showLoading('📤 Video yükleniyor...');
-                
-                try {
-                    const authRes = await fetch('/api/imagekit-auth');
-                    const auth = await authRes.json();
-                    
-                    const imagekit = new ImageKit({
-                        publicKey: 'public_mfwvdT7bS9kxwL5YpRv5YY9/W4Q=',
-                        urlEndpoint: 'https://ik.imagekit.io/5v8xlfyfa',
-                        authenticationEndpoint: '/api/imagekit-auth'
-                    });
-                    
-                    imagekit.upload({
-                        file: file,
-                        fileName: file.name,
-                        folder: '/room_videos',
-                        tags: [this.roomCode, this.userName],
-                        useUniqueFileName: true
-                    }, (err, result) => {
-                        if (err) {
-                            this.hideLoading();
-                            this.showError('Yükleme başarısız!');
-                            return;
-                        }
-                        
-                        this.socket.emit('upload-room-video', {
-                            url: result.url,
-                            fileId: result.fileId,
-                            title: file.name,
-                            fileSize: file.size
-                        });
-                        
-                        this.hideLoading();
-                    });
-                    
-                } catch (error) {
-                    this.hideLoading();
-                    this.showError('Yükleme başarısız!');
-                }
+async uploadVideo(file) {
+    if (!file || !this.isOwner) {
+        this.showError('Video yüklemek için oda sahibi olmalısın!');
+        return;
+    }
+    
+    if (!file.type.startsWith('video/')) {
+        this.showError('Video dosyası seç!');
+        return;
+    }
+    
+    if (file.size > 5 * 1024 * 1024 * 1024) {
+        this.showError('Video 5GB\'dan küçük olmalı!');
+        return;
+    }
+    
+    this.showLoading('📤 Video yükleniyor... (Bu biraz sürebilir)');
+    
+    try {
+        // ImageKit auth al
+        const authRes = await fetch('/api/imagekit-auth');
+        const auth = await authRes.json();
+        
+        // ImageKit'i başlat
+        const imagekit = new ImageKit({
+            publicKey: 'public_mfwvdT7bS9kxwL5YpRv5YY9/W4Q=',
+            urlEndpoint: 'https://ik.imagekit.io/5v8xlfyfa',
+            authenticationEndpoint: '/api/imagekit-auth'
+        });
+        
+        // Direkt upload
+        imagekit.upload({
+            file: file,
+            fileName: file.name,
+            folder: '/room_videos',
+            tags: [this.roomCode, this.userName],
+            useUniqueFileName: true,
+            onProgress: (progress) => {
+                const percent = Math.round((progress.loaded / progress.total) * 100);
+                this.loadingText.textContent = `📤 Yükleniyor: %${percent}`;
             }
+        }, (err, result) => {
+            if (err) {
+                console.error('ImageKit hatası:', err);
+                this.hideLoading();
+                this.showError('Yükleme başarısız!');
+                return;
+            }
+            
+            // Oda içi video yükleme event'ini gönder
+            this.socket.emit('upload-room-video', {
+                url: result.url,
+                fileId: result.fileId,
+                title: file.name,
+                fileSize: file.size
+            });
+            
+            this.hideLoading();
+            this.showSuccess('✅ Video yüklendi!');
+        });
+        
+    } catch (error) {
+        console.error('Video yükleme hatası:', error);
+        this.hideLoading();
+        this.showError('Yükleme başarısız!');
+    }
+}
 
             displayVideo(url) {
                 this.noVideo.style.display = 'none';
@@ -3842,11 +3858,9 @@
             }
 
             createDefaultAvatar(username) {
-                const firstLetter = username ? username.charAt(0).toUpperCase() : '?';
-                const colors = ['405DE6', '5851DB', '833AB4', 'C13584', 'E1306C', 'FD1D1D'];
-                const color = colors[Math.floor(Math.random() * colors.length)];
-                return `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 100 100"><circle cx="50" cy="50" r="50" fill="#${color}"/><text x="50" y="70" font-family="Arial" font-size="50" text-anchor="middle" fill="white">${firstLetter}</text></svg>`;
-            }
+    // Direkt PNG linki - ImageKit'te bu resim olmalı
+    return 'https://ik.imagekit.io/5v8xlfyfa/default-avatar.png';
+}
 
             formatTime(seconds) {
                 if (seconds < 60) return `${seconds}s`;
