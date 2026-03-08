@@ -1,7 +1,7 @@
 {
   "name": "birlikte-izle-platformu",
   "version": "5.0.0",
-  "description": "Gelişmiş video izleme ve sohbet platformu - Device ID + Bildirim Sistemi",
+  "description": "Gelişmiş video izleme ve sohbet platformu - Device ID + Bildirim Sistemi + Video Kütüphanesi",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
