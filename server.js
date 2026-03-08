@@ -13,14 +13,14 @@ const app = express();
 const server = http.createServer(app);
 const PORT = process.env.PORT || 10000;
 
-// 🔐 VAPID Keys for Push Notifications
+// 🔐 VAPID Keys for Push Notifications - GERÇEK ANAHTARLARIN
 const vapidKeys = {
-    publicKey: 'BAdXfKpJqW8QkQZxY3N4m5n6o7p8q9r0s1t2u3v4w5x6y7z8A9B0C1D2E3F4G5H6I7J8K9L0M',
-    privateKey: 'XfKpJqW8QkQZxY3N4m5n6o7p8q9r0s1t2u3v4w5x6y7z8'
+    publicKey: 'BBGzAdGx9mWFYT3kfBOD11L_fiNw6cCa5HZunw9Z7BUFN3g9SMT_aO0I6_s6Q9SWzPYRqntVl2cIGq0Z7YiDdeE',
+    privateKey: 'Xsk-F8uNP2d7RRpj6rleFRXN27t1CwNKF0eHjHSS3rk'
 };
 
 webpush.setVapidDetails(
-    'mailto:iletisim@birlikteizle.com',
+    'crissahahhaha@gmail.com',  // Bu email'i değiştirebilirsin
     vapidKeys.publicKey,
     vapidKeys.privateKey
 );
