@@ -13,14 +13,14 @@ const app = express();
 const server = http.createServer(app);
 const PORT = process.env.PORT || 10000;
 
-// 🔐 VAPID Keys for Push Notifications - GERÇEK ANAHTARLARIN
+// 🔐 VAPID Keys for Push Notifications
 const vapidKeys = {
-    publicKey: 'BBGzAdGx9mWFYT3kfBOD11L_fiNw6cCa5HZunw9Z7BUFN3g9SMT_aO0I6_s6Q9SWzPYRqntVl2cIGq0Z7YiDdeE',
-    privateKey: 'Xsk-F8uNP2d7RRpj6rleFRXN27t1CwNKF0eHjHSS3rk'
+    publicKey: process.env.VAPID_PUBLIC_KEY || 'BBGzAdGx9mWFYT3kfBOD11L_fiNw6cCa5HZunw9Z7BUFN3g9SMT_aO0I6_s6Q9SWzPYRqntVl2cIGq0Z7YiDdeE',
+    privateKey: process.env.VAPID_PRIVATE_KEY || 'Xsk-F8uNP2d7RRpj6rleFRXN27t1CwNKF0eHjHSS3rk'
 };
 
 webpush.setVapidDetails(
-    'mailto:crissahahhaha@gmail.com',  // DOĞRU! mailto: öneki var
+    'mailto:crissahahhaha@gmail.com',
     vapidKeys.publicKey,
     vapidKeys.privateKey
 );
@@ -46,7 +46,7 @@ const userProfiles = new Map();          // Kullanıcı profilleri (deviceId -> 
 const userSessions = new Map();          // Oturum bilgileri
 
 // 👑 ADMIN IP (Kendi IP'nle değiştir)
-const ADMIN_IP = '151.250.12.70';
+const ADMIN_IP = '151.250.0.232';
 
 // 🔄 Self-ping (Render uyku engelleme)
 setInterval(() => {
@@ -65,7 +65,6 @@ const cleanupJob = new CronJob('0 * * * *', () => {
     console.log('🧹 Temizlik başladı...');
     const now = Date.now();
     
-    // Video kütüphanesi temizliği (admin videoları - 7 gün)
     videoLibrary.forEach((video, id) => {
         if (video.expiresAt < now) {
             imagekit.deleteFile(video.fileId, () => {});
@@ -74,7 +73,6 @@ const cleanupJob = new CronJob('0 * * * *', () => {
         }
     });
     
-    // Oda videoları temizliği (24 saat)
     roomVideos.forEach((video, id) => {
         if (video.expiresAt < now) {
             imagekit.deleteFile(video.fileId, () => {});
@@ -82,14 +80,12 @@ const cleanupJob = new CronJob('0 * * * *', () => {
         }
     });
     
-    // Eski bildirim aboneliklerini temizle (30 gün)
     pushSubscriptions.forEach((sub, deviceId) => {
         if (sub.expiresAt < now) {
             pushSubscriptions.delete(deviceId);
         }
     });
     
-    // Boş odaları temizle (1 saat)
     rooms.forEach((room, code) => {
         if (room.users.size === 0 && (now - room.lastActivity) > 60 * 60 * 1000) {
             rooms.delete(code);
@@ -129,7 +125,7 @@ const upload = multer({
     }
 });
 
-// 🔧 Yardımcı fonksiyonlar - SADECE FONKSİYON TANIMLARI (io kullanmayanlar)
+// 🔧 Yardımcı fonksiyonlar
 function generateRoomCode() {
     const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
     let result = '';
@@ -147,8 +143,9 @@ function generateUserColor(username) {
 
 function generateDefaultAvatar(username) {
     const firstLetter = username ? username.charAt(0).toUpperCase() : '?';
-    const color = generateUserColor(username);
-    return `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 100 100"><rect width="100" height="100" fill="${color}"/><text x="50" y="60" font-family="Arial" font-size="40" text-anchor="middle" fill="white">${firstLetter}</text></svg>`;
+    const colors = ['405DE6', '5851DB', '833AB4', 'C13584', 'E1306C', 'FD1D1D'];
+    const color = colors[Math.floor(Math.random() * colors.length)];
+    return `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 100 100"><circle cx="50" cy="50" r="50" fill="#${color}"/><text x="50" y="70" font-family="Arial" font-size="50" text-anchor="middle" fill="white">${firstLetter}</text></svg>`;
 }
 
 function extractYouTubeId(url) {
@@ -173,7 +170,7 @@ function getLibraryList() {
     return list.sort((a, b) => b.uploadedAt - a.uploadedAt);
 }
 
-// 📡 Socket.io - ÖNCE io'YU TANIMLA
+// 📡 Socket.io
 const io = socketIo(server, {
     cors: { origin: "*", methods: ["GET", "POST"] },
     transports: ['websocket', 'polling'],
@@ -182,7 +179,6 @@ const io = socketIo(server, {
     pingInterval: 25000
 });
 
-// ŞİMDİ io KULLANAN FONKSİYONLARI TANIMLA
 function updateUserList(roomCode) {
     const room = rooms.get(roomCode);
     if (!room) return;
@@ -217,7 +213,6 @@ function recordInteraction(deviceId1, deviceId2) {
     });
 }
 
-// 📡 Socket.IO Bağlantıları
 io.on('connection', (socket) => {
     console.log('✅ Yeni bağlantı:', socket.id);
     
@@ -232,7 +227,6 @@ io.on('connection', (socket) => {
     let currentRoomCode = null;
     let currentDeviceId = null;
 
-    // Ping-Pong
     const pingInterval = setInterval(() => {
         if (socket.connected) {
             socket.emit('ping', { timestamp: Date.now() });
@@ -241,7 +235,6 @@ io.on('connection', (socket) => {
 
     socket.on('pong', (data) => {});
 
-    // 📱 Device ID kaydı
     socket.on('register-device', (data) => {
         const { deviceId, userName, userPhoto } = data;
         currentDeviceId = deviceId;
@@ -265,7 +258,6 @@ io.on('connection', (socket) => {
         socket.emit('device-registered', { success: true });
     });
 
-    // 🔔 Bildirim aboneliği
     socket.on('subscribe-push', (data) => {
         const { deviceId, subscription } = data;
         pushSubscriptions.set(deviceId, {
@@ -274,7 +266,6 @@ io.on('connection', (socket) => {
         });
     });
 
-    // 📨 Davet gönder
     socket.on('send-invite', async (data) => {
         const { fromDeviceId, toDeviceId, roomCode, roomName, fromUserName } = data;
         
@@ -303,7 +294,6 @@ io.on('connection', (socket) => {
         }
     });
 
-    // 👥 Etkileşim listesi
     socket.on('get-interactions', (data) => {
         const { deviceId } = data;
         const profile = userProfiles.get(deviceId);
@@ -331,7 +321,6 @@ io.on('connection', (socket) => {
         socket.emit('interactions-list', interactions);
     });
 
-    // 🏠 Oda oluştur
     socket.on('create-room', (data) => {
         const { userName, userPhoto, deviceId, roomName, password } = data;
         
@@ -400,7 +389,6 @@ io.on('connection', (socket) => {
         console.log(`✅ Oda oluşturuldu: ${roomCode} - Sahip: ${userName}`);
     });
 
-    // 🚪 Odaya katıl
     socket.on('join-room', (data) => {
         const { roomCode, userName, userPhoto, deviceId, password } = data;
         const room = rooms.get(roomCode.toUpperCase());
@@ -431,7 +419,6 @@ io.on('connection', (socket) => {
         socket.join(roomCode);
         room.lastActivity = Date.now();
         
-        // Oda sahibiyle etkileşim kaydet
         const owner = Array.from(room.users.values()).find(u => u.isOwner);
         if (owner && owner.deviceId !== deviceId) {
             recordInteraction(deviceId, owner.deviceId);
@@ -464,7 +451,6 @@ io.on('connection', (socket) => {
         console.log(`✅ Kullanıcı katıldı: ${userName} -> ${roomCode}`);
     });
 
-    // Oturum kurtarma
     socket.on('recover-session', (data) => {
         const { userId } = data;
         const session = userSessions.get(userId);
@@ -500,7 +486,6 @@ io.on('connection', (socket) => {
         }
     });
 
-    // 💬 Mesaj gönder
     socket.on('message', (messageData) => {
         if (!currentRoomCode || !currentUser) return;
         
@@ -545,7 +530,6 @@ io.on('connection', (socket) => {
         io.to(currentRoomCode).emit('message', message);
     });
 
-    // 💬 Mesajı yanıtla
     socket.on('reply-message', (data) => {
         if (!currentRoomCode || !currentUser) return;
         
@@ -585,7 +569,6 @@ io.on('connection', (socket) => {
         io.to(currentRoomCode).emit('message', message);
     });
 
-    // 🗑️ Mesaj sil
     socket.on('delete-message', (data) => {
         if (!currentRoomCode || !currentUser) return;
         
@@ -600,7 +583,6 @@ io.on('connection', (socket) => {
         }
     });
 
-    // 🔒 Güvenli fotoğraf görüntüle
     socket.on('view-secure-photo', (data) => {
         if (!currentRoomCode || !currentUser) return;
         
@@ -636,7 +618,6 @@ io.on('connection', (socket) => {
         }
     });
 
-    // 📤 Video yükleme (oda içi - telifli olabilir)
     socket.on('upload-room-video', (data) => {
         if (!currentRoomCode || !currentUser || !currentUser.isOwner) return;
         
@@ -674,7 +655,6 @@ io.on('connection', (socket) => {
         }
     });
 
-    // 📚 Kütüphaneden video oynat (telifsiz)
     socket.on('play-library-film', (data) => {
         const { filmId, inRoom } = data;
         const film = videoLibrary.get(filmId);
@@ -713,7 +693,6 @@ io.on('connection', (socket) => {
         }
     });
 
-    // 🎬 YouTube video paylaş
     socket.on('share-youtube-link', (data) => {
         if (!currentRoomCode || !currentUser || !currentUser.isOwner) return;
         
@@ -742,7 +721,6 @@ io.on('connection', (socket) => {
         }
     });
 
-    // 🎮 Video kontrol
     socket.on('video-control', (controlData) => {
         if (!currentRoomCode || !currentUser || !currentUser.isOwner) return;
         
@@ -755,7 +733,6 @@ io.on('connection', (socket) => {
         socket.to(currentRoomCode).emit('video-control', controlData);
     });
 
-    // 🎮 YouTube kontrol
     socket.on('youtube-control', (controlData) => {
         if (!currentRoomCode || !currentUser || !currentUser.isOwner) return;
         
@@ -765,7 +742,6 @@ io.on('connection', (socket) => {
         socket.to(currentRoomCode).emit('youtube-control', controlData);
     });
 
-    // 🗑️ Video sil
     socket.on('delete-video', () => {
         if (!currentRoomCode || !currentUser || !currentUser.isOwner) return;
         
@@ -782,7 +758,6 @@ io.on('connection', (socket) => {
         }
     });
 
-    // 👁️ Video görünürlük
     socket.on('toggle-video-visibility', () => {
         if (!currentRoomCode || !currentUser || !currentUser.isOwner) return;
         
@@ -797,7 +772,6 @@ io.on('connection', (socket) => {
         }
     });
 
-    // 🎨 Tema değiştir
     socket.on('change-theme', (theme) => {
         if (!currentRoomCode) return;
         const room = rooms.get(currentRoomCode);
@@ -808,7 +782,6 @@ io.on('connection', (socket) => {
         }
     });
 
-    // 😊 Çıkartma kaydet
     socket.on('save-stickers', (data) => {
         if (!currentRoomCode || !currentUser) return;
         
@@ -830,7 +803,6 @@ io.on('connection', (socket) => {
         io.to(currentRoomCode).emit('stickers-updated', { stickers: roomStickers });
     });
 
-    // 😊 Çıkartma gönder
     socket.on('send-sticker', (data) => {
         if (!currentRoomCode || !currentUser) return;
         
@@ -857,7 +829,6 @@ io.on('connection', (socket) => {
         io.to(currentRoomCode).emit('message', message);
     });
 
-    // 🚨 Acil durum
     socket.on('emergency-alert', () => {
         if (!currentRoomCode) return;
         
@@ -875,7 +846,6 @@ io.on('connection', (socket) => {
         }
     });
 
-    // 🔌 Bağlantı kesildi
     socket.on('disconnect', () => {
         console.log('🔌 Bağlantı koptu:', socket.id);
         
