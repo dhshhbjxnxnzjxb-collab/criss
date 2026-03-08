@@ -45,8 +45,9 @@ const pushSubscriptions = new Map();
 const userProfiles = new Map();
 const userSessions = new Map();
 
-// 👑 ADMIN DEVICE ID - .env'den alınır
-const ADMIN_DEVICE_ID = process.env.ADMIN_DEVICE_ID;
+// 👑 ADMIN ID - .env'den alınır
+const ADMIN_MAC_ADDRESS = process.env.ADMIN_MAC_ADDRESS;
+
 
 // 🔄 Self-ping
 setInterval(() => {
@@ -222,28 +223,35 @@ io.on('connection', (socket) => {
 
     socket.on('pong', (data) => {});
 
-    socket.on('register-device', (data) => {
-        const { deviceId, userName, userPhoto } = data;
-        currentDeviceId = deviceId;
-        
-        if (!userProfiles.has(deviceId)) {
-            userProfiles.set(deviceId, {
-                deviceId,
-                userName,
-                userPhoto: userPhoto || generateDefaultAvatar(userName),
-                firstSeen: Date.now(),
-                lastSeen: Date.now(),
-                interactions: new Set()
-            });
-        } else {
-            const profile = userProfiles.get(deviceId);
-            profile.lastSeen = Date.now();
-            profile.userName = userName;
-            if (userPhoto) profile.userPhoto = userPhoto;
-        }
-        
-        socket.emit('device-registered', { success: true });
-    });
+socket.on('register-device', (data) => {
+    const { deviceId, userName, userPhoto, macAddress } = data; // macAddress EKLENDİ
+    currentDeviceId = deviceId;
+    currentMacAddress = macAddress;
+    
+    // Admin kontrolü - MAC adresine göre
+    const isAdmin = (macAddress === ADMIN_MAC_ADDRESS);
+    if (isAdmin) console.log('👑 Admin girişi yapıldı!');
+    
+    if (!userProfiles.has(deviceId)) {
+        userProfiles.set(deviceId, {
+            deviceId,
+            userName,
+            userPhoto: userPhoto || generateDefaultAvatar(userName),
+            macAddress: macAddress, // MAC adresini de kaydet
+            firstSeen: Date.now(),
+            lastSeen: Date.now(),
+            interactions: new Set()
+        });
+    } else {
+        const profile = userProfiles.get(deviceId);
+        profile.lastSeen = Date.now();
+        profile.userName = userName;
+        if (userPhoto) profile.userPhoto = userPhoto;
+        if (macAddress) profile.macAddress = macAddress; // MAC güncelle
+    }
+    
+    socket.emit('device-registered', { success: true });
+});
 
     socket.on('subscribe-push', (data) => {
         const { deviceId, subscription } = data;
@@ -308,30 +316,33 @@ io.on('connection', (socket) => {
         socket.emit('interactions-list', interactions);
     });
 
-    socket.on('create-room', (data) => {
-        const { userName, userPhoto, deviceId, roomName, password } = data;
-        
-        if (!userName || !roomName) {
-            socket.emit('error', { message: 'Kullanıcı adı ve oda adı gerekli' });
-            return;
-        }
-        
-        // Admin kontrolü - deviceId'ye göre
-        const isAdmin = (deviceId === ADMIN_DEVICE_ID);
-        if (isAdmin) console.log('👑 Admin girişi yapıldı!');
-        
-        let roomCode = generateRoomCode();
-        while (rooms.has(roomCode)) roomCode = generateRoomCode();
-        
-        currentUser = {
-            id: socket.id,
-            deviceId: deviceId,
-            userName: userName,
-            userPhoto: userPhoto || generateDefaultAvatar(userName),
-            userColor: generateUserColor(userName),
-            isOwner: true,
-            isAdmin: isAdmin
-        };
+socket.on('create-room', (data) => {
+    const { userName, userPhoto, deviceId, macAddress, roomName, password } = data; // macAddress EKLENDİ
+    
+    if (!userName || !roomName) {
+        socket.emit('error', { message: 'Kullanıcı adı ve oda adı gerekli' });
+        return;
+    }
+    
+    // Admin kontrolü - MAC adresine göre
+    const isAdmin = (macAddress === ADMIN_MAC_ADDRESS);
+    if (isAdmin) console.log('👑 Admin girişi yapıldı!');
+    
+    let roomCode = generateRoomCode();
+    while (rooms.has(roomCode)) roomCode = generateRoomCode();
+    
+    currentUser = {
+        id: socket.id,
+        deviceId: deviceId,
+        macAddress: macAddress, // MAC adresini kaydet
+        userName: userName,
+        userPhoto: userPhoto || generateDefaultAvatar(userName),
+        userColor: generateUserColor(userName),
+        isOwner: true,
+        isAdmin: isAdmin
+    };
+    
+    
         
         const room = {
             code: roomCode,
@@ -380,33 +391,35 @@ io.on('connection', (socket) => {
         console.log(`✅ Oda oluşturuldu: ${roomCode} - Sahip: ${userName} - Admin: ${isAdmin}`);
     });
 
-    socket.on('join-room', (data) => {
-        const { roomCode, userName, userPhoto, deviceId, password } = data;
-        const room = rooms.get(roomCode.toUpperCase());
-        
-        if (!room) {
-            socket.emit('error', { message: 'Oda bulunamadı' });
-            return;
-        }
-        
-        if (room.password && room.password !== password) {
-            socket.emit('error', { message: 'Şifre yanlış' });
-            return;
-        }
-        
-        // Admin kontrolü - deviceId'ye göre
-        const isAdmin = (deviceId === ADMIN_DEVICE_ID);
-        if (isAdmin) console.log('👑 Admin odaya katıldı!');
-        
-        currentUser = {
-            id: socket.id,
-            deviceId: deviceId,
-            userName: userName,
-            userPhoto: userPhoto || generateDefaultAvatar(userName),
-            userColor: generateUserColor(userName),
-            isOwner: false,
-            isAdmin: isAdmin
-        };
+socket.on('join-room', (data) => {
+    const { roomCode, userName, userPhoto, deviceId, macAddress, password } = data; // macAddress EKLENDİ
+    const room = rooms.get(roomCode.toUpperCase());
+    
+    if (!room) {
+        socket.emit('error', { message: 'Oda bulunamadı' });
+        return;
+    }
+    
+    if (room.password && room.password !== password) {
+        socket.emit('error', { message: 'Şifre yanlış' });
+        return;
+    }
+    
+    // Admin kontrolü - MAC adresine göre
+    const isAdmin = (macAddress === ADMIN_MAC_ADDRESS);
+    if (isAdmin) console.log('👑 Admin odaya katıldı!');
+    
+    currentUser = {
+        id: socket.id,
+        deviceId: deviceId,
+        macAddress: macAddress, // MAC adresini kaydet
+        userName: userName,
+        userPhoto: userPhoto || generateDefaultAvatar(userName),
+        userColor: generateUserColor(userName),
+        isOwner: false,
+        isAdmin: isAdmin
+    };
+    
         
         room.users.set(socket.id, currentUser);
         users.set(socket.id, { ...currentUser, roomCode });
@@ -928,14 +941,14 @@ app.get('/api/vapid-public-key', (req, res) => {
 
 app.post('/api/library/upload', upload.single('video'), async (req, res) => {
     try {
-        const { title, deviceId } = req.body;
+        const { title, macAddress } = req.body; // deviceId yerine macAddress
         const file = req.file;
         
-        // Admin kontrolü - deviceId'ye göre
-        if (deviceId !== ADMIN_DEVICE_ID) {
-            console.log('❌ Yetkisiz erişim! Device ID eşleşmiyor');
+        // Admin kontrolü - MAC adresine göre
+        if (macAddress !== ADMIN_MAC_ADDRESS) {
+            console.log('❌ Yetkisiz erişim! MAC eşleşmiyor');
             return res.status(403).json({ error: 'Sadece admin yükleyebilir' });
-        }
+        }        
         
         if (!file) {
             return res.status(400).json({ error: 'Video dosyası gerekli' });
