@@ -941,35 +941,6 @@ app.post('/api/library/upload', upload.single('video'), async (req, res) => {
             });
         });
         
-        const videoId = 'lib_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5);
-        const expiresAt = Date.now() + (7 * 24 * 60 * 60 * 1000);
-        
-        videoLibrary.set(videoId, {
-            id: videoId,
-            title: title || file.originalname,
-            url: result.url,
-            fileId: result.fileId,
-            fileName: result.name,
-            thumbnail: result.thumbnail,
-            uploadedBy: 'Admin',
-            uploadedAt: Date.now(),
-            expiresAt: expiresAt,
-            size: result.size
-        });
-        
-        console.log(`✅ Kütüphaneye eklendi: ${title}`);
-        
-        res.json({ 
-            success: true, 
-            message: 'Video kütüphaneye eklendi',
-            library: getLibraryList()
-        });
-        
-    } catch (error) {
-        console.error('❌ Kütüphane yükleme hatası:', error);
-        res.status(500).json({ error: error.message });
-    }
-});
         
         const videoId = 'lib_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5);
         const expiresAt = Date.now() + (7 * 24 * 60 * 60 * 1000);
