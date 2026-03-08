@@ -20,7 +20,7 @@ const vapidKeys = {
 };
 
 webpush.setVapidDetails(
-    'crissahahhaha@gmail.com',  // Bu email'i değiştirebilirsin
+    'mailto:crissahahhaha@gmail.com',  // DOĞRU! mailto: öneki var
     vapidKeys.publicKey,
     vapidKeys.privateKey
 );
