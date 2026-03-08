@@ -8,7 +8,7 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <title>Birlikte İzle - Arkadaşlarınla Video İzle</title>
     
-    <!-- Icon Kütüphaneleri (Direct Link - PNG gerektirmez) -->
+    <!-- Icon Kütüphaneleri -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
     
@@ -18,7 +18,6 @@
     <script src="https://sdk.imagekit.io/5v8xlfyfa/imagekit.sdk.js"></script>
     
     <style>
-        /* RESET ve TEMEL STILLER */
         * { 
             margin: 0; 
             padding: 0; 
@@ -46,7 +45,13 @@
             transition: background-color 0.3s ease, color 0.3s ease;
         }
         
-        /* LIGHT TEMA */
+        input, textarea, [contenteditable="true"] {
+            -webkit-user-select: text;
+            -moz-user-select: text;
+            -ms-user-select: text;
+            user-select: text;
+        }
+        
         body.light-theme {
             background: #f5f5f5;
             color: #262626;
@@ -186,15 +191,11 @@
             border-color: #dbdbdb;
         }
         
-        /* Inputlar için seçim izni */
-        input, textarea, [contenteditable="true"] {
-            -webkit-user-select: text;
-            -moz-user-select: text;
-            -ms-user-select: text;
-            user-select: text;
+        body.light-theme .youtube-btn {
+            background: #FF0000 !important;
+            color: white !important;
         }
         
-        /* ANİMASYONLAR */
         @keyframes spin {
             0% { transform: rotate(0deg); }
             100% { transform: rotate(360deg); }
@@ -216,7 +217,11 @@
             100% { transform: scale(1); }
         }
         
-        /* LANDING PAGE */
+        @keyframes messageAppear {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
         .landing { 
             display: flex; 
             flex-direction: column; 
@@ -301,7 +306,6 @@
             font-size: 20px;
         }
         
-        /* MODAL STILLERİ */
         .modal { 
             display: none; 
             position: fixed; 
@@ -361,6 +365,9 @@
             color: #ccc; 
             font-weight: 500; 
             font-size: 14px;
+            display: flex;
+            align-items: center;
+            gap: 5px;
         }
         
         .form-input { 
@@ -385,7 +392,6 @@
             margin-top: 25px; 
         }
         
-        /* FOTOĞRAF SEÇENEKLERİ */
         .photo-options {
             display: flex;
             gap: 12px;
@@ -426,7 +432,6 @@
             color: white;
         }
         
-        /* HAMBURGER MENÜ */
         .hamburger-btn {
             width: 44px;
             height: 44px;
@@ -563,7 +568,6 @@
             font-size: 16px;
         }
         
-        /* TEMA SEÇENEKLERİ */
         .theme-options {
             display: flex;
             gap: 12px;
@@ -602,7 +606,6 @@
             border: 2px solid #0095F6;
         }
         
-        /* VİDEO KÜTÜPHANESİ */
         .library-list {
             max-height: 450px;
             overflow-y: auto;
@@ -719,7 +722,6 @@
             font-size: 22px;
         }
         
-        /* DAVET LİSTESİ */
         .invite-list {
             max-height: 450px;
             overflow-y: auto;
@@ -793,7 +795,6 @@
             border-radius: 30px;
         }
         
-        /* YOUTUBE ARAMA */
         .youtube-modal {
             max-width: 95% !important;
             width: 95% !important;
@@ -819,7 +820,6 @@
             font-size: 15px;
         }
         
-        /* YÜKLEME GÖSTERGESİ */
         .loading-spinner {
             border: 4px solid #333;
             border-top: 4px solid #0095F6;
@@ -830,7 +830,6 @@
             margin: 0 auto 20px;
         }
         
-        /* TAM EKRAN GÖRSEL */
         .fullscreen-modal {
             position: fixed;
             top: 0;
@@ -905,7 +904,6 @@
             animation: pulse 1s infinite;
         }
         
-        /* PİP VİDEO */
         .pip-video {
             position: fixed;
             bottom: 20px;
@@ -951,7 +949,6 @@
             border: 2px solid rgba(255,255,255,0.3);
         }
         
-        /* ANA SOHBET ARAYÜZÜ */
         .chat-interface { 
             display: none; 
             flex: 1; 
@@ -965,7 +962,6 @@
             z-index: 5;
         }
         
-        /* HEADER */
         .header { 
             background: #000; 
             padding: 12px 16px; 
@@ -1036,10 +1032,822 @@
             font-size: 14px;
             color: #4cd964;
         }
+        
+        .container {
+            display: flex;
+            flex: 1;
+            overflow: hidden;
+            height: calc(100vh - 70px);
+            position: relative;
+        }
+        
+        .container.video-hidden .video-section {
+            display: none;
+        }
+        
+        .container.video-hidden .chat-section {
+            max-width: 100%;
+            flex: 1;
+        }
+        
+        .video-section {
+            flex: 2;
+            display: flex;
+            flex-direction: column;
+            background: #000;
+            min-width: 0;
+            position: relative;
+            height: 100%;
+        }
+        
+        body.light-theme .video-section {
+            background: #1a1a1a;
+        }
+        
+        .video-container {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: #000;
+            position: relative;
+            min-height: 0;
+        }
+        
+        .video-player {
+            width: 100%;
+            height: 100%;
+            max-height: 100%;
+            object-fit: contain;
+            background: #000;
+        }
+        
+        .no-video {
+            text-align: center;
+            padding: 20px;
+            color: #8e8e8e;
+            width: 100%;
+        }
+        
+        .no-video-icon {
+            font-size: clamp(48px, 10vw, 64px);
+            margin-bottom: 15px;
+            opacity: 0.5;
+        }
+        
+        .no-video h3 {
+            font-size: clamp(16px, 5vw, 20px);
+            margin-bottom: 8px;
+        }
+        
+        .no-video p {
+            font-size: clamp(12px, 3.5vw, 14px);
+        }
+        
+        .video-expiry-badge {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: rgba(0,0,0,0.7);
+            color: #ff3b30;
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+            z-index: 10;
+            border: 1px solid #ff3b30;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+        
+        .video-controls {
+            padding: 10px 12px;
+            background: #1a1a1a;
+            display: flex;
+            gap: 6px;
+            justify-content: center;
+            align-items: center;
+            border-top: 1px solid #262626;
+            flex-wrap: wrap;
+            flex-shrink: 0;
+        }
+        
+        .control-btn {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 30px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            background: #262626;
+            color: #fff;
+            border: 1px solid #363636;
+            white-space: nowrap;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 5px;
+            min-width: 40px;
+            transition: all 0.2s;
+        }
+        
+        .control-btn i {
+            font-size: 16px;
+        }
+        
+        .control-btn:active {
+            transform: scale(0.95);
+        }
+        
+        .control-btn select {
+            background: transparent;
+            color: #fff;
+            border: none;
+            font-size: 14px;
+            font-weight: 500;
+        }
+        
+        .upload-btn {
+            background: #0095F6;
+            color: #fff;
+            border: none;
+        }
+        
+        .youtube-btn {
+            background: #FF0000 !important;
+            color: white !important;
+            border: none !important;
+        }
+        
+        .delete-btn {
+            background: #ff3b30;
+            color: #fff;
+            border: none;
+        }
+        
+        .chat-section {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            background: #000;
+            border-left: 1px solid #262626;
+            min-width: 280px;
+            max-width: 400px;
+            position: relative;
+            height: 100%;
+        }
+        
+        body.light-theme .chat-section {
+            background: #f5f5f5;
+            border-left-color: #dbdbdb;
+        }
+        
+        .messages {
+            flex: 1;
+            padding: 16px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            scroll-behavior: smooth;
+            min-height: 0;
+        }
+        
+        .message {
+            display: flex;
+            gap: 8px;
+            max-width: 85%;
+            animation: messageAppear 0.2s ease;
+            position: relative;
+        }
+        
+        .message.own {
+            align-self: flex-end;
+            flex-direction: row-reverse;
+        }
+        
+        .message-avatar {
+            width: clamp(32px, 7vw, 36px);
+            height: clamp(32px, 7vw, 36px);
+            border-radius: 50%;
+            object-fit: cover;
+            flex-shrink: 0;
+            border: 2px solid #262626;
+        }
+        
+        body.light-theme .message-avatar {
+            border-color: #dbdbdb;
+        }
+        
+        .message-content {
+            padding: 10px 14px;
+            border-radius: 22px;
+            background: #262626;
+            max-width: 100%;
+            word-wrap: break-word;
+            position: relative;
+            font-size: clamp(13px, 4vw, 15px);
+            line-height: 1.4;
+        }
+        
+        .message.own .message-content {
+            background: #0095F6;
+            color: #fff;
+        }
+        
+        .message-header {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            margin-bottom: 4px;
+        }
+        
+        .message-sender {
+            font-size: clamp(11px, 3.5vw, 13px);
+            font-weight: 600;
+            color: #8e8e8e;
+        }
+        
+        .message.own .message-sender {
+            color: rgba(255,255,255,0.7);
+        }
+        
+        .message-text {
+            font-size: clamp(13px, 4vw, 15px);
+            line-height: 1.4;
+            word-break: break-word;
+        }
+        
+        .message-image {
+            max-width: min(200px, 60vw);
+            max-height: min(200px, 40vh);
+            border-radius: 12px;
+            margin-top: 8px;
+            cursor: pointer;
+            transition: transform 0.2s;
+            pointer-events: auto;
+        }
+        
+        .message-sticker {
+            width: clamp(100px, 25vw, 150px);
+            height: clamp(100px, 25vw, 150px);
+            border-radius: 16px;
+            object-fit: cover;
+            cursor: pointer;
+        }
+        
+        .secure-photo-btn {
+            background: #ff3b30;
+            color: white;
+            border: none;
+            border-radius: 30px;
+            padding: clamp(10px, 3vw, 12px) clamp(16px, 4vw, 20px);
+            font-size: clamp(12px, 3.5vw, 14px);
+            font-weight: 600;
+            cursor: pointer;
+            margin-top: 8px;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            transition: all 0.2s;
+            width: 100%;
+            justify-content: center;
+        }
+        
+        .secure-photo-btn:active {
+            transform: scale(0.95);
+        }
+        
+        .reply-indicator {
+            font-size: 12px;
+            padding: 4px 10px;
+            background: rgba(255,255,255,0.1);
+            border-radius: 12px;
+            margin-bottom: 6px;
+            color: #8e8e8e;
+            border-left: 3px solid #0095F6;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+        
+        .message.own .reply-indicator {
+            background: rgba(0,0,0,0.2);
+        }
+        
+        .message-time {
+            font-size: clamp(8px, 2.5vw, 10px);
+            color: #8e8e8e;
+            margin-top: 4px;
+            text-align: right;
+        }
+        
+        .message.own .message-time {
+            color: rgba(255,255,255,0.5);
+        }
+        
+        .message-reactions {
+            display: flex;
+            gap: 4px;
+            margin-top: 6px;
+            padding-top: 4px;
+            border-top: 1px solid rgba(255,255,255,0.1);
+            flex-wrap: wrap;
+        }
+        
+        .reaction-badge {
+            background: #1a1a1a;
+            border-radius: 20px;
+            padding: 4px 8px;
+            font-size: clamp(10px, 3vw, 12px);
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            border: 1px solid #363636;
+        }
+        
+        body.light-theme .reaction-badge {
+            background: #fff;
+            border-color: #dbdbdb;
+        }
+        
+        .system-message {
+            align-self: center;
+            background: rgba(255,255,255,0.1);
+            padding: 6px 14px;
+            border-radius: 20px;
+            font-size: clamp(11px, 3vw, 12px);
+            color: #8e8e8e;
+            margin: 8px 0;
+            font-style: italic;
+            max-width: 90%;
+            text-align: center;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+        
+        .chat-input-wrapper {
+            background: #1a1a1a;
+            border-top: 1px solid #262626;
+            padding: 12px;
+            position: relative;
+            flex-shrink: 0;
+            width: 100%;
+        }
+        
+        .input-actions {
+            display: flex;
+            align-items: flex-end;
+            gap: 8px;
+            width: 100%;
+        }
+        
+        .action-btn {
+            width: clamp(44px, 10vw, 48px);
+            height: clamp(44px, 10vw, 48px);
+            border-radius: 50%;
+            border: none;
+            background: #262626;
+            color: #fff;
+            font-size: clamp(20px, 5vw, 22px);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            flex-shrink: 0;
+            transition: all 0.2s;
+            border: 1px solid #363636;
+        }
+        
+        .action-btn:active {
+            transform: scale(0.95);
+        }
+        
+        .action-btn i {
+            font-size: 22px;
+        }
+        
+        .photo-btn {
+            background: #E1306C;
+            border: none;
+            color: #fff;
+        }
+        
+        .mic-btn {
+            background: #405DE6;
+            border: none;
+            color: #fff;
+        }
+        
+        .chat-message-input {
+            flex: 1;
+            background: #262626;
+            border: 1px solid #363636;
+            border-radius: 25px;
+            padding: clamp(12px, 3vw, 14px) clamp(16px, 4vw, 18px);
+            color: #fff;
+            font-size: clamp(14px, 4vw, 16px);
+            line-height: 1.4;
+            max-height: 120px;
+            min-height: 48px;
+            resize: none;
+            outline: none;
+            transition: border 0.2s;
+            -webkit-user-select: text;
+            -moz-user-select: text;
+            -ms-user-select: text;
+            user-select: text;
+            width: 100%;
+        }
+        
+        .chat-message-input:focus {
+            border-color: #0095F6;
+        }
+        
+        .chat-message-input::placeholder {
+            color: #8e8e8e;
+        }
+        
+        .send-btn {
+            width: clamp(48px, 12vw, 54px);
+            height: clamp(48px, 12vw, 54px);
+            border-radius: 50%;
+            border: none;
+            background: #ff3b30;
+            color: white;
+            font-size: clamp(24px, 6vw, 26px);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            flex-shrink: 0;
+            transition: all 0.2s;
+            border: 1px solid #ff3b30;
+        }
+        
+        .send-btn:active {
+            transform: scale(0.95);
+            background: #d63026;
+        }
+        
+        .send-btn i {
+            font-size: 24px;
+        }
+        
+        .sticker-panel {
+            background: #1a1a1a;
+            border-radius: 20px 20px 0 0;
+            padding: 16px;
+            margin-top: 12px;
+            border: 1px solid #262626;
+            max-height: 350px;
+            overflow-y: auto;
+        }
+        
+        .sticker-panel-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 16px;
+            font-weight: 600;
+            color: #fff;
+        }
+        
+        .create-sticker-btn {
+            background: #0095F6;
+            border: none;
+            color: white;
+            padding: 8px 16px;
+            border-radius: 30px;
+            font-size: clamp(12px, 3.5vw, 13px);
+            font-weight: 600;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+        
+        .close-panel-btn {
+            background: #262626;
+            border: 1px solid #363636;
+            color: #fff;
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            font-size: 18px;
+            cursor: pointer;
+        }
+        
+        .sticker-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 10px;
+        }
+        
+        .sticker-item {
+            width: 100%;
+            aspect-ratio: 1;
+            border-radius: 12px;
+            object-fit: cover;
+            cursor: pointer;
+            border: 2px solid #363636;
+            transition: transform 0.2s;
+        }
+        
+        .sticker-item:hover {
+            transform: scale(1.1);
+            border-color: #0095F6;
+        }
+        
+        .selected-images-preview {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px;
+            margin: 16px 0;
+        }
+        
+        .preview-image {
+            width: 100%;
+            aspect-ratio: 1;
+            border-radius: 12px;
+            object-fit: cover;
+            border: 2px solid #363636;
+        }
+        
+        .reaction-menu {
+            position: fixed;
+            background: #262626;
+            border-radius: 40px;
+            padding: 8px 12px;
+            display: flex;
+            gap: 8px;
+            box-shadow: 0 5px 20px rgba(0,0,0,0.5);
+            border: 1px solid #363636;
+            z-index: 2000;
+            animation: slideUp 0.2s ease;
+            transform: translateX(-50%);
+        }
+        
+        .reaction-emoji {
+            font-size: clamp(24px, 6vw, 28px);
+            cursor: pointer;
+            padding: 8px;
+            border-radius: 50%;
+            transition: all 0.2s;
+            width: clamp(44px, 10vw, 48px);
+            height: clamp(44px, 10vw, 48px);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .reaction-emoji:hover {
+            background: #1a1a1a;
+            transform: scale(1.2);
+        }
+        
+        .message-actions {
+            position: fixed;
+            background: #262626;
+            border-radius: 20px;
+            padding: 8px;
+            box-shadow: 0 5px 20px rgba(0,0,0,0.5);
+            border: 1px solid #363636;
+            z-index: 2000;
+            min-width: 160px;
+        }
+        
+        .action-item {
+            padding: 12px 16px;
+            cursor: pointer;
+            border-radius: 12px;
+            transition: background 0.2s;
+            font-size: clamp(13px, 4vw, 14px);
+            color: #fff;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .action-item:hover {
+            background: #1a1a1a;
+        }
+        
+        .action-item.delete {
+            color: #ff3b30;
+        }
+        
+        .action-item.reply {
+            color: #0095F6;
+        }
+        
+        .action-item i {
+            font-size: 16px;
+        }
+        
+        #recordingIndicator {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: #ff3b30;
+            color: white;
+            padding: 30px 40px;
+            border-radius: 30px;
+            z-index: 10000;
+            text-align: center;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.5);
+            border: 2px solid rgba(255,255,255,0.3);
+            backdrop-filter: blur(10px);
+        }
+        
+        #recordingIndicator i {
+            font-size: 48px;
+            display: block;
+            margin-bottom: 15px;
+        }
+        
+        #recordingTimer {
+            font-size: 24px;
+            font-weight: bold;
+            margin: 15px 0;
+        }
+        
+        .users-sidebar {
+            width: 250px;
+            background: #1a1a1a;
+            padding: 20px 12px;
+            overflow-y: auto;
+            border-left: 1px solid #262626;
+            flex-shrink: 0;
+        }
+        
+        body.light-theme .users-sidebar {
+            background: #fff;
+            border-left-color: #dbdbdb;
+        }
+        
+        .users-sidebar h3 {
+            margin-bottom: 15px;
+            color: #fff;
+            font-size: clamp(14px, 4vw, 16px);
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .users-sidebar h3 i {
+            color: #0095F6;
+        }
+        
+        .user-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 10px;
+            border-radius: 12px;
+            margin-bottom: 8px;
+            background: #262626;
+            transition: background 0.2s;
+        }
+        
+        body.light-theme .user-item {
+            background: #f0f0f0;
+        }
+        
+        .user-avatar {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            object-fit: cover;
+        }
+        
+        .user-info {
+            flex: 1;
+        }
+        
+        .user-name {
+            font-size: 14px;
+            font-weight: 500;
+            color: #fff;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            flex-wrap: wrap;
+        }
+        
+        body.light-theme .user-name {
+            color: #262626;
+        }
+        
+        .owner-badge {
+            background: #0095F6;
+            color: #fff;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-size: 9px;
+            font-weight: 600;
+        }
+        
+        .admin-badge {
+            background: #ff3b30;
+            color: white;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-size: 9px;
+            font-weight: 600;
+        }
+        
+        @media (max-width: 768px) {
+            .container {
+                flex-direction: column;
+            }
+            
+            .video-section {
+                height: 45vh;
+                max-height: 45vh;
+            }
+            
+            .chat-section {
+                max-width: 100%;
+                border-left: none;
+                border-top: 1px solid #262626;
+                height: calc(55vh - 70px);
+            }
+            
+            .users-sidebar {
+                display: none;
+            }
+            
+            .video-controls {
+                padding: 8px;
+                gap: 4px;
+            }
+            
+            .control-btn {
+                padding: 6px 12px;
+                font-size: 12px;
+            }
+            
+            .message-image {
+                max-width: 150px;
+                max-height: 150px;
+            }
+            
+            .message-sticker {
+                width: 100px;
+                height: 100px;
+            }
+            
+            .sticker-grid {
+                grid-template-columns: repeat(3, 1fr);
+            }
+            
+            .hamburger-menu {
+                width: 250px;
+            }
+            
+            .pip-video {
+                width: 240px;
+                height: 160px;
+            }
+        }
+        
+        .hidden {
+            display: none !important;
+        }
+        
+        .error-message {
+            background: #ff3b30;
+            color: white;
+            padding: 15px;
+            border-radius: 12px;
+            margin: 10px 0;
+            text-align: center;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+        
+        .success-message {
+            background: #34c759;
+            color: white;
+            padding: 15px;
+            border-radius: 12px;
+            margin: 10px 0;
+            text-align: center;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
     </style>
 </head>
 <body>
-    <!-- LANDING PAGE -->
     <div class="landing" id="landingPage">
         <h1><i class="bi bi-camera-reels-fill"></i> Birlikte İzle</h1>
         <p>Arkadaşlarınla video izle, sohbet et, çıkartma paylaş!</p>
@@ -1056,7 +1864,6 @@
         </div>
     </div>
 
-    <!-- KULLANICI BİLGİ MODALI -->
     <div class="modal" id="userInfoModal">
         <div class="modal-content">
             <h2><i class="bi bi-person-circle"></i> Profil Bilgileri</h2>
@@ -1075,7 +1882,6 @@
         </div>
     </div>
 
-    <!-- ODA OLUŞTUR MODALI -->
     <div class="modal" id="createRoomModal">
         <div class="modal-content">
             <h2><i class="bi bi-house-add-fill"></i> Oda Oluştur</h2>
@@ -1094,7 +1900,6 @@
         </div>
     </div>
 
-    <!-- ODAYA KATIL MODALI -->
     <div class="modal" id="joinRoomModal">
         <div class="modal-content">
             <h2><i class="bi bi-door-open-fill"></i> Odaya Katıl</h2>
@@ -1113,7 +1918,6 @@
         </div>
     </div>
 
-    <!-- VİDEO KÜTÜPHANESİ MODALI -->
     <div class="modal" id="videoLibraryModal">
         <div class="modal-content">
             <h2><i class="bi bi-film"></i> Video Kütüphanesi</h2>
@@ -1138,7 +1942,6 @@
         </div>
     </div>
 
-    <!-- DAVET LİSTESİ MODALI -->
     <div class="modal" id="inviteModal">
         <div class="modal-content">
             <h2><i class="bi bi-people-fill"></i> Arkadaşlarını Davet Et</h2>
@@ -1154,7 +1957,6 @@
         </div>
     </div>
 
-    <!-- YOUTUBE ARAMA MODALI -->
     <div class="modal" id="youtubeSearchModal">
         <div class="modal-content youtube-modal">
             <h2><i class="bi bi-youtube"></i> YouTube'da Ara</h2>
@@ -1178,7 +1980,6 @@
         </div>
     </div>
 
-    <!-- YÜKLEME MODALI -->
     <div class="modal" id="loadingModal">
         <div class="modal-content">
             <div style="text-align: center; padding: 40px;">
@@ -1188,7 +1989,6 @@
         </div>
     </div>
 
-    <!-- TAM EKRAN GÖRSEL MODALI -->
     <div class="fullscreen-modal" id="fullscreenImageModal" oncontextmenu="return false;">
         <button class="close-fullscreen" onclick="hideFullscreenImage()">
             <i class="bi bi-x-lg"></i>
@@ -1197,7 +1997,6 @@
         <div class="view-timer" id="securePhotoTimer" style="display: none;"></div>
     </div>
 
-    <!-- PİP VİDEO -->
     <div class="pip-video" id="pipVideo">
         <button class="pip-close" onclick="closePipVideo()">
             <i class="bi bi-x-lg"></i>
@@ -1205,7 +2004,6 @@
         <video id="pipVideoPlayer" controls></video>
     </div>
 
-    <!-- HAMBURGER MENÜ -->
     <div class="menu-overlay" id="menuOverlay" onclick="closeMenu()"></div>
     <div class="hamburger-menu" id="hamburgerMenu">
         <div class="menu-header">
@@ -1246,9 +2044,7 @@
         </div>
     </div>
 
-    <!-- ANA SOHBET ARAYÜZÜ -->
     <div class="chat-interface" id="chatInterface">
-        <!-- HEADER -->
         <div class="header">
             <div class="header-left">
                 <button class="hamburger-btn" onclick="toggleMenu()">
@@ -1271,1185 +2067,1056 @@
             </div>
         </div>
 
-    <!-- CONTAINER -->
-    <div class="container" id="mainContainer">
-        <!-- VİDEO SECTION -->
-        <div class="video-section" id="videoSection">
-            <div class="video-container" id="videoContainer">
-                <div class="no-video" id="noVideo">
-                    <div class="no-video-icon">
-                        <i class="bi bi-camera-video-off-fill"></i>
+        <div class="container" id="mainContainer">
+            <div class="video-section" id="videoSection">
+                <div class="video-container" id="videoContainer">
+                    <div class="no-video" id="noVideo">
+                        <div class="no-video-icon">
+                            <i class="bi bi-camera-video-off-fill"></i>
+                        </div>
+                        <h3>Video Yok</h3>
+                        <p>YouTube'dan video seç veya kendi videonu yükle!</p>
                     </div>
-                    <h3>Video Yok</h3>
-                    <p>YouTube'dan video seç veya kendi videonu yükle!</p>
-                </div>
-                <video id="videoPlayer" class="video-player" controls style="display: none;" controlsList="nodownload" oncontextmenu="return false;" playsinline></video>
-                <div id="youtubeContainer" style="width: 100%; height: 100%; display: none;"></div>
-                <div class="video-expiry-badge" id="videoExpiryBadge" style="display: none;">
-                    <i class="bi bi-hourglass-split"></i> <span></span>
-                </div>
-            </div>
-            
-            <!-- VİDEO KONTROLLERİ -->
-            <div class="video-controls" id="videoControls" style="display: none;">
-                <button class="control-btn" onclick="videoPlatform.seek(-10)" title="10 saniye geri">
-                    <i class="bi bi-skip-backward-fill"></i>
-                </button>
-                <button class="control-btn" id="playPauseBtn" onclick="videoPlatform.togglePlay()" title="Oynat/Durdur">
-                    <i class="bi bi-pause-fill"></i>
-                </button>
-                <button class="control-btn" onclick="videoPlatform.seek(10)" title="10 saniye ileri">
-                    <i class="bi bi-skip-forward-fill"></i>
-                </button>
-                <select class="control-btn" id="playbackRate" onchange="videoPlatform.changePlaybackRate(this.value)" title="Oynatma hızı">
-                    <option value="0.5">0.5x</option>
-                    <option value="1" selected>1x</option>
-                    <option value="1.5">1.5x</option>
-                    <option value="2">2x</option>
-                </select>
-                <button class="control-btn upload-btn" onclick="document.getElementById('videoFileInput').click()" title="Video yükle">
-                    <i class="bi bi-cloud-upload-fill"></i>
-                </button>
-                <button class="control-btn youtube-btn" onclick="showYouTubeSearch()" title="YouTube ara" style="background: #FF0000;">
-                    <i class="bi bi-youtube"></i>
-                </button>
-                <button class="control-btn delete-btn" onclick="videoPlatform.deleteVideo()" title="Videoyu kapat">
-                    <i class="bi bi-trash-fill"></i>
-                </button>
-                <button class="control-btn" id="toggleVideoBtn" onclick="videoPlatform.toggleVideoSection()" title="Video bölümünü gizle/göster">
-                    <i class="bi bi-chevron-up"></i>
-                </button>
-            </div>
-        </div>
-
-        <!-- CHAT SECTION -->
-        <div class="chat-section">
-            <!-- MESAJLAR -->
-            <div class="messages" id="messagesContainer"></div>
-            
-            <!-- CHAT INPUT -->
-            <div class="chat-input-wrapper">
-                <div class="input-actions">
-                    <button class="action-btn" id="plusButton" title="Çıkartmalar">
-                        <i class="bi bi-emoji-smile-fill"></i>
-                    </button>
-                    <button class="action-btn photo-btn" id="photoButton" title="Fotoğraf gönder">
-                        <i class="bi bi-camera-fill"></i>
-                    </button>
-                    <button class="action-btn mic-btn" id="micButton" title="Ses kaydı">
-                        <i class="bi bi-mic-fill"></i>
-                    </button>
-                    <textarea id="messageInput" class="chat-message-input" placeholder="Mesaj yaz..." rows="1"></textarea>
-                    <button class="send-btn" id="sendButton" title="Gönder">
-                        <i class="bi bi-send-fill"></i>
-                    </button>
+                    <video id="videoPlayer" class="video-player" controls style="display: none;" controlsList="nodownload" oncontextmenu="return false;" playsinline></video>
+                    <div id="youtubeContainer" style="width: 100%; height: 100%; display: none;"></div>
+                    <div class="video-expiry-badge" id="videoExpiryBadge" style="display: none;">
+                        <i class="bi bi-hourglass-split"></i> <span></span>
+                    </div>
                 </div>
                 
-                <!-- ÇIKARTMA PANELİ -->
-                <div class="sticker-panel" id="stickerPanel" style="display: none;">
-                    <div class="sticker-panel-header">
-                        <span><i class="bi bi-emoji-smile-fill"></i> Çıkartmalarım</span>
-                        <button class="create-sticker-btn" id="createStickerBtn">
-                            <i class="bi bi-plus-circle-fill"></i> Oluştur
-                        </button>
-                    </div>
-                    <div class="sticker-grid" id="myStickers"></div>
-                </div>
-                
-                <!-- ÇIKARTMA OLUŞTURMA PANELİ -->
-                <div class="sticker-panel" id="createStickerPanel" style="display: none;">
-                    <div class="sticker-panel-header">
-                        <span><i class="bi bi-pencil-fill"></i> Çıkartma Oluştur</span>
-                        <button class="create-sticker-btn" onclick="closeCreatePanel()">
-                            <i class="bi bi-x-lg"></i>
-                        </button>
-                    </div>
-                    <input type="file" id="stickerImageInput" accept="image/*" multiple style="display: none;">
-                    <button class="btn btn-primary" id="selectImagesBtn" style="width: 100%; margin-bottom: 15px;">
-                        <i class="bi bi-images"></i> Fotoğrafları Seç
+                <div class="video-controls" id="videoControls" style="display: none;">
+                    <button class="control-btn" onclick="videoPlatform.seek(-10)" title="10 saniye geri">
+                        <i class="bi bi-skip-backward-fill"></i>
                     </button>
-                    <div class="sticker-grid" id="selectedImagesPreview"></div>
-                    <button class="btn btn-primary" id="saveStickersBtn" style="width: 100%; margin-top: 15px; display: none;">
-                        <i class="bi bi-save-fill"></i> Kaydet
+                    <button class="control-btn" id="playPauseBtn" onclick="videoPlatform.togglePlay()" title="Oynat/Durdur">
+                        <i class="bi bi-pause-fill"></i>
+                    </button>
+                    <button class="control-btn" onclick="videoPlatform.seek(10)" title="10 saniye ileri">
+                        <i class="bi bi-skip-forward-fill"></i>
+                    </button>
+                    <select class="control-btn" id="playbackRate" onchange="videoPlatform.changePlaybackRate(this.value)" title="Oynatma hızı">
+                        <option value="0.5">0.5x</option>
+                        <option value="1" selected>1x</option>
+                        <option value="1.5">1.5x</option>
+                        <option value="2">2x</option>
+                    </select>
+                    <button class="control-btn upload-btn" onclick="document.getElementById('videoFileInput').click()" title="Video yükle">
+                        <i class="bi bi-cloud-upload-fill"></i>
+                    </button>
+                    <button class="control-btn youtube-btn" onclick="showYouTubeSearch()" title="YouTube ara">
+                        <i class="bi bi-youtube"></i>
+                    </button>
+                    <button class="control-btn delete-btn" onclick="videoPlatform.deleteVideo()" title="Videoyu kapat">
+                        <i class="bi bi-trash-fill"></i>
+                    </button>
+                    <button class="control-btn" id="toggleVideoBtn" onclick="videoPlatform.toggleVideoSection()" title="Video bölümünü gizle/göster">
+                        <i class="bi bi-chevron-up"></i>
                     </button>
                 </div>
             </div>
-        </div>
 
-        <!-- GİZLİ DOSYA INPUTLARI -->
-        <input type="file" id="fileInput" style="display: none;" accept="*">
-        <input type="file" id="imageInput" style="display: none;" accept="image/*">
-        <input type="file" id="audioInput" style="display: none;" accept="audio/*">
-        <input type="file" id="videoFileInput" style="display: none;" accept="video/*">
+            <div class="chat-section">
+                <div class="messages" id="messagesContainer"></div>
+                
+                <div class="chat-input-wrapper">
+                    <div class="input-actions">
+                        <button class="action-btn" id="plusButton" title="Çıkartmalar">
+                            <i class="bi bi-emoji-smile-fill"></i>
+                        </button>
+                        <button class="action-btn photo-btn" id="photoButton" title="Fotoğraf gönder">
+                            <i class="bi bi-camera-fill"></i>
+                        </button>
+                        <button class="action-btn mic-btn" id="micButton" title="Ses kaydı">
+                            <i class="bi bi-mic-fill"></i>
+                        </button>
+                        <textarea id="messageInput" class="chat-message-input" placeholder="Mesaj yaz..." rows="1"></textarea>
+                        <button class="send-btn" id="sendButton" title="Gönder">
+                            <i class="bi bi-send-fill"></i>
+                        </button>
+                    </div>
+                    
+                    <div class="sticker-panel" id="stickerPanel" style="display: none;">
+                        <div class="sticker-panel-header">
+                            <span><i class="bi bi-emoji-smile-fill"></i> Çıkartmalarım</span>
+                            <button class="create-sticker-btn" id="createStickerBtn">
+                                <i class="bi bi-plus-circle-fill"></i> Oluştur
+                            </button>
+                        </div>
+                        <div class="sticker-grid" id="myStickers"></div>
+                    </div>
+                    
+                    <div class="sticker-panel" id="createStickerPanel" style="display: none;">
+                        <div class="sticker-panel-header">
+                            <span><i class="bi bi-pencil-fill"></i> Çıkartma Oluştur</span>
+                            <button class="create-sticker-btn" onclick="closeCreatePanel()">
+                                <i class="bi bi-x-lg"></i>
+                            </button>
+                        </div>
+                        <input type="file" id="stickerImageInput" accept="image/*" multiple style="display: none;">
+                        <button class="btn btn-primary" id="selectImagesBtn" style="width: 100%; margin-bottom: 15px;">
+                            <i class="bi bi-images"></i> Fotoğrafları Seç
+                        </button>
+                        <div class="sticker-grid" id="selectedImagesPreview"></div>
+                        <button class="btn btn-primary" id="saveStickersBtn" style="width: 100%; margin-top: 15px; display: none;">
+                            <i class="bi bi-save-fill"></i> Kaydet
+                        </button>
+                    </div>
+                </div>
+            </div>
 
-        <!-- KULLANICI LİSTESİ SIDEBAR -->
-        <div class="users-sidebar">
-            <h3><i class="bi bi-people-fill"></i> Odadaki Kişiler</h3>
-            <div id="usersList"></div>
+            <input type="file" id="fileInput" style="display: none;" accept="*">
+            <input type="file" id="imageInput" style="display: none;" accept="image/*">
+            <input type="file" id="audioInput" style="display: none;" accept="audio/*">
+            <input type="file" id="videoFileInput" style="display: none;" accept="video/*">
+
+            <div class="users-sidebar">
+                <h3><i class="bi bi-people-fill"></i> Odadaki Kişiler</h3>
+                <div id="usersList"></div>
+            </div>
         </div>
     </div>
-</div>
 
-<script>
-    // YOUTUBE ARAMA SINIFI
-    class YouTubeSearch {
-        constructor() {
-            this.apiKey = 'AIzaSyD6Jp8nyJ_p5MUaCnnn8BFh7pxpPMiMorc';
-        }
-
-        async search(query) {
-            try {
-                const response = await fetch(
-                    `https://www.googleapis.com/youtube/v3/search?part=snippet&maxResults=20&q=${encodeURIComponent(query)}&type=video&key=${this.apiKey}`
-                );
-                const data = await response.json();
-                return data.items || [];
-            } catch (error) {
-                console.error('YouTube arama hatası:', error);
-                return [];
+    <script>
+        class YouTubeSearch {
+            constructor() {
+                this.apiKey = 'AIzaSyD6Jp8nyJ_p5MUaCnnn8BFh7pxpPMiMorc';
             }
-        }
 
-        async trending() {
-            try {
-                const response = await fetch(
-                    `https://www.googleapis.com/youtube/v3/videos?part=snippet&chart=mostPopular&maxResults=20&regionCode=TR&key=${this.apiKey}`
-                );
-                const data = await response.json();
-                return data.items || [];
-            } catch (error) {
-                console.error('Trend video hatası:', error);
-                return [];
-            }
-        }
-    }
-
-    // ANA VİDEOPLATFORM SINIFI
-    class VideoPlatform {
-        constructor() {
-            this.socket = null;
-            this.deviceId = this.getDeviceId();
-            this.userId = localStorage.getItem('userId') || this.generateId();
-            this.userName = localStorage.getItem('userName') || '';
-            this.userPhoto = localStorage.getItem('userPhoto') || '';
-            this.roomCode = null;
-            this.roomName = null;
-            this.isOwner = false;
-            this.isAdmin = false;
-            this.videoVisible = true;
-            this.currentTheme = localStorage.getItem('theme') || 'dark';
-            this.youtubePlayer = null;
-            this.pushSubscription = null;
-            this.selectedStickers = [];
-            this.currentReplyTo = null;
-            this.pendingPhotoType = null;
-            this.mediaRecorder = null;
-            this.audioChunks = [];
-            this.longPressTimer = null;
-            
-            this.initElements();
-            this.initEvents();
-            this.showLanding();
-            this.registerDevice();
-            this.requestPermissions();
-            this.setTheme(this.currentTheme);
-            this.preventScreenshots();
-        }
-
-        generateId() {
-            const id = 'user_' + Math.random().toString(36).substr(2, 9) + '_' + Date.now();
-            localStorage.setItem('userId', id);
-            return id;
-        }
-
-        getDeviceId() {
-            let deviceId = localStorage.getItem('deviceId');
-            if (!deviceId) {
-                deviceId = 'device_' + Math.random().toString(36).substr(2, 9) + '_' + Date.now();
-                localStorage.setItem('deviceId', deviceId);
-            }
-            return deviceId;
-        }
-
-        preventScreenshots() {
-            document.addEventListener('keyup', (e) => {
-                if (e.key === 'PrintScreen') {
-                    this.showError('📵 Ekran görüntüsü alınamaz!');
-                }
-            });
-
-            document.addEventListener('keydown', (e) => {
-                if (e.ctrlKey && (e.key === 'p' || e.key === 'P' || e.key === 's' || e.key === 'S' || e.key === 'u' || e.key === 'U')) {
-                    e.preventDefault();
-                }
-                if (e.ctrlKey && e.shiftKey && (e.key === 'I' || e.key === 'i' || e.key === 'C' || e.key === 'c')) {
-                    e.preventDefault();
-                }
-            });
-
-            document.addEventListener('contextmenu', (e) => {
-                if (!e.target.classList.contains('chat-message-input') && 
-                    !e.target.classList.contains('form-input') &&
-                    !e.target.closest('.chat-message-input')) {
-                    e.preventDefault();
-                }
-            });
-        }
-
-        async requestPermissions() {
-            // Bildirim izni
-            if ('Notification' in window && Notification.permission !== 'granted') {
-                const permission = await Notification.requestPermission();
-                if (permission === 'granted') {
-                    this.registerPushNotifications();
-                }
-            }
-            
-            // Service worker kaydet
-            if ('serviceWorker' in navigator) {
+            async search(query) {
                 try {
-                    const registration = await navigator.serviceWorker.register('/sw.js');
-                    console.log('✅ Service worker kaydedildi');
+                    const response = await fetch(
+                        `https://www.googleapis.com/youtube/v3/search?part=snippet&maxResults=20&q=${encodeURIComponent(query)}&type=video&key=${this.apiKey}`
+                    );
+                    const data = await response.json();
+                    return data.items || [];
                 } catch (error) {
-                    console.log('Service worker hatası:', error);
+                    console.error('YouTube arama hatası:', error);
+                    return [];
+                }
+            }
+
+            async trending() {
+                try {
+                    const response = await fetch(
+                        `https://www.googleapis.com/youtube/v3/videos?part=snippet&chart=mostPopular&maxResults=20&regionCode=TR&key=${this.apiKey}`
+                    );
+                    const data = await response.json();
+                    return data.items || [];
+                } catch (error) {
+                    console.error('Trend video hatası:', error);
+                    return [];
                 }
             }
         }
 
-        async registerPushNotifications() {
-            if (!('serviceWorker' in navigator) || !('PushManager' in window)) return;
-            
-            try {
-                const registration = await navigator.serviceWorker.ready;
+        class VideoPlatform {
+            constructor() {
+                this.socket = null;
+                this.deviceId = this.getDeviceId();
+                this.userId = localStorage.getItem('userId') || this.generateId();
+                this.userName = localStorage.getItem('userName') || '';
+                this.userPhoto = localStorage.getItem('userPhoto') || '';
+                this.roomCode = null;
+                this.roomName = null;
+                this.isOwner = false;
+                this.isAdmin = false;
+                this.videoVisible = true;
+                this.currentTheme = localStorage.getItem('theme') || 'dark';
+                this.youtubePlayer = null;
+                this.pushSubscription = null;
+                this.selectedStickers = [];
+                this.currentReplyTo = null;
+                this.pendingPhotoType = null;
+                this.mediaRecorder = null;
+                this.audioChunks = [];
+                this.longPressTimer = null;
                 
-                // VAPID key'i al
-                const res = await fetch('/api/vapid-public-key');
-                const { publicKey } = await res.json();
-                
-                // Push subscription oluştur
-                const subscription = await registration.pushManager.subscribe({
-                    userVisibleOnly: true,
-                    applicationServerKey: this.urlBase64ToUint8Array(publicKey)
-                });
-                
-                this.pushSubscription = subscription;
-                
-                // Sunucuya gönder
-                if (this.socket && this.socket.connected) {
-                    this.socket.emit('subscribe-push', {
-                        deviceId: this.deviceId,
-                        subscription: subscription
-                    });
-                }
-                
-            } catch (error) {
-                console.log('Push bildirim hatası:', error);
-            }
-        }
-
-        urlBase64ToUint8Array(base64String) {
-            const padding = '='.repeat((4 - base64String.length % 4) % 4);
-            const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
-            const rawData = window.atob(base64);
-            const outputArray = new Uint8Array(rawData.length);
-            for (let i = 0; i < rawData.length; ++i) {
-                outputArray[i] = rawData.charCodeAt(i);
-            }
-            return outputArray;
-        }
-
-        registerDevice() {
-            if (this.userName && this.socket && this.socket.connected) {
-                this.socket.emit('register-device', {
-                    deviceId: this.deviceId,
-                    userName: this.userName,
-                    userPhoto: this.userPhoto
-                });
-            }
-        }
-
-        initElements() {
-            // Landing
-            this.landingPage = document.getElementById('landingPage');
-            this.createRoomBtn = document.getElementById('createRoomBtn');
-            this.joinRoomBtn = document.getElementById('joinRoomBtn');
-            this.libraryBtn = document.getElementById('libraryBtn');
-            
-            // Modals
-            this.userInfoModal = document.getElementById('userInfoModal');
-            this.userNameInput = document.getElementById('userNameInput');
-            this.userPhotoInput = document.getElementById('userPhotoInput');
-            this.cancelUserInfo = document.getElementById('cancelUserInfo');
-            this.confirmUserInfo = document.getElementById('confirmUserInfo');
-            
-            this.createRoomModal = document.getElementById('createRoomModal');
-            this.roomNameInput = document.getElementById('roomNameInput');
-            this.roomPasswordInput = document.getElementById('roomPasswordInput');
-            this.cancelCreateRoom = document.getElementById('cancelCreateRoom');
-            this.confirmCreateRoom = document.getElementById('confirmCreateRoom');
-            
-            this.joinRoomModal = document.getElementById('joinRoomModal');
-            this.roomCodeInput = document.getElementById('roomCodeInput');
-            this.joinPasswordInput = document.getElementById('joinPasswordInput');
-            this.cancelJoinRoom = document.getElementById('cancelJoinRoom');
-            this.confirmJoinRoom = document.getElementById('confirmJoinRoom');
-            
-            this.videoLibraryModal = document.getElementById('videoLibraryModal');
-            this.libraryFilmList = document.getElementById('libraryFilmList');
-            this.uploadToLibraryBtn = document.getElementById('uploadToLibraryBtn');
-            this.libraryVideoInput = document.getElementById('libraryVideoInput');
-            
-            this.inviteModal = document.getElementById('inviteModal');
-            this.inviteList = document.getElementById('inviteList');
-            
-            this.youtubeSearchModal = document.getElementById('youtubeSearchModal');
-            this.youtubeSearchInput = document.getElementById('youtubeSearchInput');
-            this.youtubeSearchResults = document.getElementById('youtubeSearchResults');
-            
-            this.loadingModal = document.getElementById('loadingModal');
-            this.loadingText = document.getElementById('loadingText');
-            
-            this.fullscreenModal = document.getElementById('fullscreenImageModal');
-            this.fullscreenImage = document.getElementById('fullscreenImage');
-            this.securePhotoTimer = document.getElementById('securePhotoTimer');
-            
-            this.pipVideo = document.getElementById('pipVideo');
-            this.pipVideoPlayer = document.getElementById('pipVideoPlayer');
-            
-            this.hamburgerMenu = document.getElementById('hamburgerMenu');
-            this.menuOverlay = document.getElementById('menuOverlay');
-            this.menuUserName = document.getElementById('menuUserName');
-            this.inviteMenuItem = document.getElementById('inviteMenuItem');
-            this.themePanel = document.getElementById('themePanel');
-            
-            this.chatInterface = document.getElementById('chatInterface');
-            this.roomNameDisplay = document.getElementById('roomNameDisplay');
-            this.roomCodeDisplay = document.getElementById('roomCodeDisplay');
-            this.onlineCount = document.getElementById('onlineCount');
-            this.mainContainer = document.getElementById('mainContainer');
-            this.toggleVideoBtn = document.getElementById('toggleVideoBtn');
-            
-            // Video Elements
-            this.videoContainer = document.getElementById('videoContainer');
-            this.noVideo = document.getElementById('noVideo');
-            this.videoPlayer = document.getElementById('videoPlayer');
-            this.videoControls = document.getElementById('videoControls');
-            this.videoFileInput = document.getElementById('videoFileInput');
-            this.playPauseBtn = document.getElementById('playPauseBtn');
-            this.playbackRate = document.getElementById('playbackRate');
-            this.youtubeContainer = document.getElementById('youtubeContainer');
-            this.videoExpiryBadge = document.getElementById('videoExpiryBadge');
-            
-            // Chat Elements
-            this.messagesContainer = document.getElementById('messagesContainer');
-            this.messageInput = document.getElementById('messageInput');
-            this.sendButton = document.getElementById('sendButton');
-            this.plusButton = document.getElementById('plusButton');
-            this.photoButton = document.getElementById('photoButton');
-            this.micButton = document.getElementById('micButton');
-            
-            // Sticker Elements
-            this.stickerPanel = document.getElementById('stickerPanel');
-            this.createStickerBtn = document.getElementById('createStickerBtn');
-            this.createStickerPanel = document.getElementById('createStickerPanel');
-            this.stickerImageInput = document.getElementById('stickerImageInput');
-            this.selectImagesBtn = document.getElementById('selectImagesBtn');
-            this.selectedImagesPreview = document.getElementById('selectedImagesPreview');
-            this.saveStickersBtn = document.getElementById('saveStickersBtn');
-            this.myStickers = document.getElementById('myStickers');
-            
-            // Users List
-            this.usersList = document.getElementById('usersList');
-            
-            // Hidden Inputs
-            this.fileInput = document.getElementById('fileInput');
-            this.imageInput = document.getElementById('imageInput');
-            this.audioInput = document.getElementById('audioInput');
-        }
-
-        initEvents() {
-            // Landing Buttons
-            this.createRoomBtn.addEventListener('click', () => this.startCreateRoom());
-            this.joinRoomBtn.addEventListener('click', () => this.startJoinRoom());
-            this.libraryBtn.addEventListener('click', () => this.showLibrary());
-            
-            // User Info Modal
-            this.cancelUserInfo.addEventListener('click', () => this.hideModal(this.userInfoModal));
-            this.confirmUserInfo.addEventListener('click', () => this.saveUserInfo());
-            
-            // Create Room Modal
-            this.cancelCreateRoom.addEventListener('click', () => this.hideModal(this.createRoomModal));
-            this.confirmCreateRoom.addEventListener('click', () => this.createRoom());
-            
-            // Join Room Modal
-            this.cancelJoinRoom.addEventListener('click', () => this.hideModal(this.joinRoomModal));
-            this.confirmJoinRoom.addEventListener('click', () => this.joinRoom());
-            
-            // Message Input
-            this.messageInput.addEventListener('input', () => {
-                this.messageInput.style.height = 'auto';
-                this.messageInput.style.height = Math.min(this.messageInput.scrollHeight, 120) + 'px';
-            });
-            
-            this.messageInput.addEventListener('keypress', (e) => {
-                if (e.key === 'Enter' && !e.shiftKey) {
-                    e.preventDefault();
-                    this.sendMessage();
-                }
-            });
-            
-            // Send Button
-            this.sendButton.addEventListener('click', () => this.sendMessage());
-            
-            // Plus Button (Stickers)
-            this.plusButton.addEventListener('click', () => {
-                this.stickerPanel.style.display = this.stickerPanel.style.display === 'none' ? 'block' : 'none';
-                this.createStickerPanel.style.display = 'none';
-            });
-            
-            // Photo Button
-            this.photoButton.addEventListener('click', () => this.showPhotoOptions());
-            
-            // Mic Button
-            this.micButton.addEventListener('click', () => this.startRecording());
-            
-            // Create Sticker
-            this.createStickerBtn.addEventListener('click', () => {
-                this.stickerPanel.style.display = 'none';
-                this.createStickerPanel.style.display = 'block';
-            });
-            
-            this.selectImagesBtn.addEventListener('click', () => this.stickerImageInput.click());
-            this.stickerImageInput.addEventListener('change', (e) => this.handleStickerImages(e));
-            this.saveStickersBtn.addEventListener('click', () => this.saveStickers());
-            
-            // Video File Input
-            this.videoFileInput.addEventListener('change', (e) => {
-                if (e.target.files[0]) this.uploadVideo(e.target.files[0]);
-            });
-            
-            // Video Player Events
-            this.videoPlayer.addEventListener('play', () => this.onVideoPlay());
-            this.videoPlayer.addEventListener('pause', () => this.onVideoPause());
-            this.videoPlayer.addEventListener('seeked', () => this.onVideoSeek());
-            this.videoPlayer.addEventListener('ratechange', () => this.onVideoRateChange());
-            
-            // Library Upload
-            this.uploadToLibraryBtn.addEventListener('click', () => this.libraryVideoInput.click());
-            this.libraryVideoInput.addEventListener('change', (e) => {
-                if (e.target.files[0]) this.handleLibraryUpload(e.target.files[0]);
-            });
-            
-            // Invite Menu Item
-            this.inviteMenuItem.addEventListener('click', () => this.showInviteModal());
-            
-            // File Inputs
-            this.fileInput.addEventListener('change', (e) => this.handleFileUpload(e, 'file'));
-            this.imageInput.addEventListener('change', (e) => this.handleFileUpload(e, 'image'));
-            this.audioInput.addEventListener('change', (e) => this.handleFileUpload(e, 'audio'));
-            
-            // Enter key for modals
-            this.userNameInput.addEventListener('keypress', (e) => {
-                if (e.key === 'Enter') this.saveUserInfo();
-            });
-            
-            this.roomNameInput.addEventListener('keypress', (e) => {
-                if (e.key === 'Enter') this.createRoom();
-            });
-            
-            this.roomCodeInput.addEventListener('keypress', (e) => {
-                if (e.key === 'Enter') this.joinRoom();
-            });
-            
-            this.youtubeSearchInput.addEventListener('keypress', (e) => {
-                if (e.key === 'Enter') searchYouTubeVideos();
-            });
-        }
-
-        showLanding() {
-            this.landingPage.style.display = 'flex';
-            this.chatInterface.style.display = 'none';
-            this.hideAllModals();
-        }
-
-        showModal(modal) {
-            this.hideAllModals();
-            modal.classList.add('active');
-        }
-
-        hideModal(modal) {
-            modal.classList.remove('active');
-        }
-
-        hideAllModals() {
-            document.querySelectorAll('.modal').forEach(m => m.classList.remove('active'));
-        }
-
-        showLoading(text = 'İşlem yapılıyor...') {
-            this.loadingText.textContent = text;
-            this.loadingModal.classList.add('active');
-        }
-
-        hideLoading() {
-            this.loadingModal.classList.remove('active');
-        }
-
-        showError(message) {
-            console.error('❌', message);
-            alert('❌ ' + message);
-        }
-
-        showSuccess(message) {
-            console.log('✅', message);
-        }
-
-        setTheme(theme) {
-            this.currentTheme = theme;
-            localStorage.setItem('theme', theme);
-            if (theme === 'light') {
-                document.body.classList.add('light-theme');
-            } else {
-                document.body.classList.remove('light-theme');
-            }
-        }
-
-        startCreateRoom() {
-            this.currentAction = 'create';
-            if (!this.userName) {
-                this.showModal(this.userInfoModal);
-                this.userNameInput.focus();
-            } else {
-                this.showModal(this.createRoomModal);
-                this.roomNameInput.focus();
-            }
-        }
-
-        startJoinRoom() {
-            this.currentAction = 'join';
-            if (!this.userName) {
-                this.showModal(this.userInfoModal);
-                this.userNameInput.focus();
-            } else {
-                this.showModal(this.joinRoomModal);
-                this.roomCodeInput.focus();
-            }
-        }
-
-        saveUserInfo() {
-            const userName = this.userNameInput.value.trim();
-            if (!userName) {
-                this.showError('Kullanıcı adını gir!');
-                return;
-            }
-            
-            this.userName = userName;
-            localStorage.setItem('userName', userName);
-            
-            const file = this.userPhotoInput.files[0];
-            if (file) {
-                const reader = new FileReader();
-                reader.onload = (e) => {
-                    this.userPhoto = e.target.result;
-                    localStorage.setItem('userPhoto', this.userPhoto);
-                    this.proceedWithAction();
-                };
-                reader.readAsDataURL(file);
-            } else {
-                this.userPhoto = this.createDefaultAvatar(userName);
-                localStorage.setItem('userPhoto', this.userPhoto);
-                this.proceedWithAction();
-            }
-            
-            this.hideModal(this.userInfoModal);
-        }
-
-        proceedWithAction() {
-            if (this.currentAction === 'create') {
-                this.showModal(this.createRoomModal);
-                this.roomNameInput.focus();
-            } else if (this.currentAction === 'join') {
-                this.showModal(this.joinRoomModal);
-                this.roomCodeInput.focus();
-            }
-        }
-
-        connectSocket() {
-            this.showLoading('Sunucuya bağlanılıyor...');
-            
-            const serverUrl = window.location.hostname === 'localhost' 
-                ? 'http://localhost:10000' 
-                : window.location.origin;
-            
-            this.socket = io(serverUrl, {
-                transports: ['websocket', 'polling'],
-                reconnectionAttempts: 10,
-                reconnectionDelay: 2000,
-                timeout: 60000
-            });
-            
-            this.setupSocketEvents();
-        }
-
-        setupSocketEvents() {
-            this.socket.on('connect', () => {
-                console.log('✅ Socket bağlandı');
-                this.hideLoading();
-                
-                // Device ID'yi kaydet
-                this.socket.emit('register-device', {
-                    deviceId: this.deviceId,
-                    userName: this.userName,
-                    userPhoto: this.userPhoto
-                });
-                
-                // Push subscription varsa gönder
-                if (this.pushSubscription) {
-                    this.socket.emit('subscribe-push', {
-                        deviceId: this.deviceId,
-                        subscription: this.pushSubscription
-                    });
-                }
-                
-                // Oturum kurtarmayı dene
-                setTimeout(() => {
-                    this.socket.emit('recover-session', { userId: this.userId });
-                }, 1000);
-                
-                if (this.currentAction === 'create') {
-                    this.finalizeCreateRoom();
-                } else if (this.currentAction === 'join') {
-                    this.finalizeJoinRoom();
-                }
-            });
-
-            this.socket.on('device-registered', (data) => {
-                console.log('✅ Device kaydedildi');
-            });
-
-            this.socket.on('room-created', (data) => {
-                this.roomCode = data.roomCode;
-                this.roomName = data.roomName;
-                this.isOwner = data.isOwner;
-                this.isAdmin = data.isAdmin;
-                
-                this.menuUserName.innerHTML = `<i class="bi bi-person-circle"></i> ${this.userName}`;
-                this.showChatInterface();
-                
-                if (data.shareableLink) {
-                    console.log('🔗 Davet linki:', data.shareableLink);
-                }
-            });
-
-            this.socket.on('room-joined', (data) => {
-                this.roomCode = data.roomCode;
-                this.roomName = data.roomName;
-                this.isOwner = data.isOwner;
-                this.isAdmin = data.isAdmin;
-                
-                this.menuUserName.innerHTML = `<i class="bi bi-person-circle"></i> ${this.userName}`;
-                this.showChatInterface();
-                
-                if (data.previousMessages) {
-                    data.previousMessages.forEach(msg => this.displayMessage(msg));
-                }
-                
-                if (data.stickers) {
-                    this.displayStickers(data.stickers);
-                }
-                
-                if (data.activeVideo) {
-                    if (data.activeVideo.type === 'youtube') {
-                        this.displayYouTubeVideo(data.activeVideo.videoId, data.activeVideo.title);
-                    } else {
-                        this.displayVideo(data.activeVideo.url);
-                    }
-                }
-                
-                if (data.videoVisible === false) {
-                    this.videoVisible = false;
-                    this.mainContainer.classList.add('video-hidden');
-                    this.toggleVideoBtn.innerHTML = '<i class="bi bi-chevron-down"></i>';
-                }
-                
-                if (data.theme) {
-                    this.setTheme(data.theme);
-                }
-            });
-
-            this.socket.on('session-recovered', (data) => {
-                this.roomCode = data.roomCode;
-                this.roomName = data.roomName;
-                this.isOwner = data.isOwner;
-                this.isAdmin = data.isAdmin;
-                
-                this.menuUserName.innerHTML = `<i class="bi bi-person-circle"></i> ${this.userName}`;
-                this.showChatInterface();
-                this.addSystemMessage('🔄 Oturum kurtarıldı, tekrar hoş geldin!');
-            });
-
-            this.socket.on('video-library-list', (videos) => {
-                this.updateLibraryList(videos);
-            });
-
-            this.socket.on('interactions-list', (users) => {
-                this.updateInviteList(users);
-            });
-
-            this.socket.on('invite-sent', (data) => {
-                this.showSuccess('✅ Davet gönderildi!');
-                this.hideModal(this.inviteModal);
-            });
-
-            this.socket.on('invite-error', (data) => {
-                this.showError(data.message);
-            });
-
-            this.socket.on('user-list-update', (users) => {
-                this.updateUsersList(users);
-                this.onlineCount.innerHTML = `<i class="bi bi-person-fill"></i> ${users.length} kişi`;
-            });
-
-            this.socket.on('user-joined', (data) => {
-                this.addSystemMessage(`👋 ${data.userName} katıldı`);
-            });
-
-            this.socket.on('user-left', (data) => {
-                this.addSystemMessage(`🚪 ${data.userName} ayrıldı`);
-            });
-
-            this.socket.on('video-uploaded', (data) => {
-                this.displayVideo(data.videoUrl);
-                this.addSystemMessage(`🎬 "${data.title}" yüklendi`);
-                
-                if (data.fromLibrary) {
-                    this.addSystemMessage(`📚 Kütüphaneden film yansıtılıyor`);
-                }
-            });
-
-            this.socket.on('youtube-video-shared', (data) => {
-                this.displayYouTubeVideo(data.videoId, data.title);
-                this.addSystemMessage(`🎬 "${data.title}" paylaşıldı`);
-            });
-
-            this.socket.on('video-control', (data) => {
-                if (!this.isOwner) this.syncVideoState(data);
-            });
-
-            this.socket.on('youtube-control', (data) => {
-                if (!this.isOwner && this.youtubePlayer) this.syncYouTubeState(data);
-            });
-
-            this.socket.on('video-deleted', () => {
-                this.hideVideo();
-                this.addSystemMessage('🗑️ Video kapatıldı');
-            });
-
-            this.socket.on('video-visibility-changed', (data) => {
-                this.videoVisible = data.visible;
-                if (this.videoVisible) {
-                    this.mainContainer.classList.remove('video-hidden');
-                    this.toggleVideoBtn.innerHTML = '<i class="bi bi-chevron-up"></i>';
-                } else {
-                    this.mainContainer.classList.add('video-hidden');
-                    this.toggleVideoBtn.innerHTML = '<i class="bi bi-chevron-down"></i>';
-                }
-            });
-
-            this.socket.on('theme-changed', (theme) => {
-                this.setTheme(theme);
-            });
-
-            this.socket.on('message', (msg) => {
-                this.displayMessage(msg);
-                setTimeout(() => {
-                    this.messagesContainer.scrollTop = this.messagesContainer.scrollHeight;
-                }, 50);
-            });
-
-            this.socket.on('message-deleted', (data) => {
-                this.removeMessage(data.messageId);
-            });
-
-            this.socket.on('secure-photo-view', (data) => {
-                this.showSecurePhoto(data);
-            });
-
-            this.socket.on('stickers-updated', (data) => {
-                this.displayStickers(data.stickers);
-            });
-
-            this.socket.on('play-pip-video', (data) => {
-                this.showPipVideo(data.url, data.title);
-            });
-
-            this.socket.on('emergency-message', (data) => {
-                this.addSystemMessage(`🚨 Acil durum! Oda siliniyor...`);
-                setTimeout(() => window.location.reload(), 3000);
-            });
-
-            this.socket.on('error', (data) => {
-                this.hideLoading();
-                this.showError(data.message);
-            });
-
-            this.socket.on('disconnect', () => {
-                this.addSystemMessage('🔌 Bağlantı koptu, yeniden bağlanılıyor...');
-            });
-
-            this.socket.on('reconnect', () => {
-                this.addSystemMessage('✅ Yeniden bağlanıldı');
+                this.initElements();
+                this.initEvents();
+                this.showLanding();
                 this.registerDevice();
-            });
-        }
-
-        createRoom() {
-            const roomName = this.roomNameInput.value.trim();
-            const password = this.roomPasswordInput.value.trim();
-            
-            if (!roomName) {
-                this.showError('Oda adını gir!');
-                return;
+                this.requestPermissions();
+                this.setTheme(this.currentTheme);
+                this.preventScreenshots();
             }
-            
-            this.hideModal(this.createRoomModal);
-            this.showLoading('Oda oluşturuluyor...');
-            
-            this.pendingRoomData = { roomName, password };
-            this.currentAction = 'create';
-            
-            this.connectSocket();
-        }
 
-        finalizeCreateRoom() {
-            if (this.pendingRoomData) {
-                this.socket.emit('create-room', {
-                    userName: this.userName,
-                    userPhoto: this.userPhoto,
-                    deviceId: this.deviceId,
-                    roomName: this.pendingRoomData.roomName,
-                    password: this.pendingRoomData.password || null
+            generateId() {
+                const id = 'user_' + Math.random().toString(36).substr(2, 9) + '_' + Date.now();
+                localStorage.setItem('userId', id);
+                return id;
+            }
+
+            getDeviceId() {
+                let deviceId = localStorage.getItem('deviceId');
+                if (!deviceId) {
+                    deviceId = 'device_' + Math.random().toString(36).substr(2, 9) + '_' + Date.now();
+                    localStorage.setItem('deviceId', deviceId);
+                }
+                return deviceId;
+            }
+
+            preventScreenshots() {
+                document.addEventListener('keyup', (e) => {
+                    if (e.key === 'PrintScreen') {
+                        this.showError('📵 Ekran görüntüsü alınamaz!');
+                    }
                 });
-                this.pendingRoomData = null;
-            }
-        }
 
-        joinRoom() {
-            const roomCode = this.roomCodeInput.value.trim().toUpperCase();
-            const password = this.joinPasswordInput.value.trim();
-            
-            if (!roomCode || roomCode.length !== 6) {
-                this.showError('Geçerli 6 haneli kod gir!');
-                return;
-            }
-            
-            this.hideModal(this.joinRoomModal);
-            this.showLoading('Odaya katılınıyor...');
-            
-            this.pendingRoomData = { roomCode, password };
-            this.currentAction = 'join';
-            
-            this.connectSocket();
-        }
-
-        finalizeJoinRoom() {
-            if (this.pendingRoomData) {
-                this.socket.emit('join-room', {
-                    roomCode: this.pendingRoomData.roomCode,
-                    userName: this.userName,
-                    userPhoto: this.userPhoto,
-                    deviceId: this.deviceId,
-                    password: this.pendingRoomData.password || null
+                document.addEventListener('keydown', (e) => {
+                    if (e.ctrlKey && (e.key === 'p' || e.key === 'P' || e.key === 's' || e.key === 'S' || e.key === 'u' || e.key === 'U')) {
+                        e.preventDefault();
+                    }
+                    if (e.ctrlKey && e.shiftKey && (e.key === 'I' || e.key === 'i' || e.key === 'C' || e.key === 'c')) {
+                        e.preventDefault();
+                    }
                 });
-                this.pendingRoomData = null;
+
+                document.addEventListener('contextmenu', (e) => {
+                    if (!e.target.classList.contains('chat-message-input') && 
+                        !e.target.classList.contains('form-input') &&
+                        !e.target.closest('.chat-message-input')) {
+                        e.preventDefault();
+                    }
+                });
             }
-        }
 
-        showChatInterface() {
-            this.landingPage.style.display = 'none';
-            this.chatInterface.style.display = 'flex';
-            this.roomNameDisplay.textContent = this.roomName;
-            this.roomCodeDisplay.textContent = this.roomCode;
-            
-            if (this.isOwner) {
-                this.videoControls.style.display = 'flex';
-            }
-            
-            this.messageInput.disabled = false;
-            this.messageInput.focus();
-        }
-
-        toggleVideoSection() {
-            if (!this.socket || !this.isOwner) return;
-            this.socket.emit('toggle-video-visibility');
-        }
-
-        showLibrary() {
-            this.hideAllModals();
-            this.videoLibraryModal.classList.add('active');
-            this.loadLibraryFilms();
-        }
-
-        async loadLibraryFilms() {
-            try {
-                const res = await fetch('/api/library');
-                const films = await res.json();
+            async requestPermissions() {
+                if ('Notification' in window && Notification.permission !== 'granted') {
+                    await Notification.requestPermission();
+                }
                 
+                if ('serviceWorker' in navigator) {
+                    try {
+                        await navigator.serviceWorker.register('/sw.js');
+                    } catch (error) {}
+                }
+            }
+
+            registerDevice() {
+                if (this.userName && this.socket && this.socket.connected) {
+                    this.socket.emit('register-device', {
+                        deviceId: this.deviceId,
+                        userName: this.userName,
+                        userPhoto: this.userPhoto
+                    });
+                }
+            }
+
+            initElements() {
+                this.landingPage = document.getElementById('landingPage');
+                this.createRoomBtn = document.getElementById('createRoomBtn');
+                this.joinRoomBtn = document.getElementById('joinRoomBtn');
+                this.libraryBtn = document.getElementById('libraryBtn');
+                
+                this.userInfoModal = document.getElementById('userInfoModal');
+                this.userNameInput = document.getElementById('userNameInput');
+                this.userPhotoInput = document.getElementById('userPhotoInput');
+                this.cancelUserInfo = document.getElementById('cancelUserInfo');
+                this.confirmUserInfo = document.getElementById('confirmUserInfo');
+                
+                this.createRoomModal = document.getElementById('createRoomModal');
+                this.roomNameInput = document.getElementById('roomNameInput');
+                this.roomPasswordInput = document.getElementById('roomPasswordInput');
+                this.cancelCreateRoom = document.getElementById('cancelCreateRoom');
+                this.confirmCreateRoom = document.getElementById('confirmCreateRoom');
+                
+                this.joinRoomModal = document.getElementById('joinRoomModal');
+                this.roomCodeInput = document.getElementById('roomCodeInput');
+                this.joinPasswordInput = document.getElementById('joinPasswordInput');
+                this.cancelJoinRoom = document.getElementById('cancelJoinRoom');
+                this.confirmJoinRoom = document.getElementById('confirmJoinRoom');
+                
+                this.videoLibraryModal = document.getElementById('videoLibraryModal');
+                this.libraryFilmList = document.getElementById('libraryFilmList');
+                this.uploadToLibraryBtn = document.getElementById('uploadToLibraryBtn');
+                this.libraryVideoInput = document.getElementById('libraryVideoInput');
+                
+                this.inviteModal = document.getElementById('inviteModal');
+                this.inviteList = document.getElementById('inviteList');
+                
+                this.youtubeSearchModal = document.getElementById('youtubeSearchModal');
+                this.youtubeSearchInput = document.getElementById('youtubeSearchInput');
+                this.youtubeSearchResults = document.getElementById('youtubeSearchResults');
+                
+                this.loadingModal = document.getElementById('loadingModal');
+                this.loadingText = document.getElementById('loadingText');
+                
+                this.fullscreenModal = document.getElementById('fullscreenImageModal');
+                this.fullscreenImage = document.getElementById('fullscreenImage');
+                this.securePhotoTimer = document.getElementById('securePhotoTimer');
+                
+                this.pipVideo = document.getElementById('pipVideo');
+                this.pipVideoPlayer = document.getElementById('pipVideoPlayer');
+                
+                this.hamburgerMenu = document.getElementById('hamburgerMenu');
+                this.menuOverlay = document.getElementById('menuOverlay');
+                this.menuUserName = document.getElementById('menuUserName');
+                this.inviteMenuItem = document.getElementById('inviteMenuItem');
+                this.themePanel = document.getElementById('themePanel');
+                
+                this.chatInterface = document.getElementById('chatInterface');
+                this.roomNameDisplay = document.getElementById('roomNameDisplay');
+                this.roomCodeDisplay = document.getElementById('roomCodeDisplay');
+                this.onlineCount = document.getElementById('onlineCount');
+                this.mainContainer = document.getElementById('mainContainer');
+                this.toggleVideoBtn = document.getElementById('toggleVideoBtn');
+                
+                this.videoContainer = document.getElementById('videoContainer');
+                this.noVideo = document.getElementById('noVideo');
+                this.videoPlayer = document.getElementById('videoPlayer');
+                this.videoControls = document.getElementById('videoControls');
+                this.videoFileInput = document.getElementById('videoFileInput');
+                this.playPauseBtn = document.getElementById('playPauseBtn');
+                this.playbackRate = document.getElementById('playbackRate');
+                this.youtubeContainer = document.getElementById('youtubeContainer');
+                this.videoExpiryBadge = document.getElementById('videoExpiryBadge');
+                
+                this.messagesContainer = document.getElementById('messagesContainer');
+                this.messageInput = document.getElementById('messageInput');
+                this.sendButton = document.getElementById('sendButton');
+                this.plusButton = document.getElementById('plusButton');
+                this.photoButton = document.getElementById('photoButton');
+                this.micButton = document.getElementById('micButton');
+                
+                this.stickerPanel = document.getElementById('stickerPanel');
+                this.createStickerBtn = document.getElementById('createStickerBtn');
+                this.createStickerPanel = document.getElementById('createStickerPanel');
+                this.stickerImageInput = document.getElementById('stickerImageInput');
+                this.selectImagesBtn = document.getElementById('selectImagesBtn');
+                this.selectedImagesPreview = document.getElementById('selectedImagesPreview');
+                this.saveStickersBtn = document.getElementById('saveStickersBtn');
+                this.myStickers = document.getElementById('myStickers');
+                
+                this.usersList = document.getElementById('usersList');
+                
+                this.fileInput = document.getElementById('fileInput');
+                this.imageInput = document.getElementById('imageInput');
+                this.audioInput = document.getElementById('audioInput');
+            }
+
+            initEvents() {
+                this.createRoomBtn.addEventListener('click', () => this.startCreateRoom());
+                this.joinRoomBtn.addEventListener('click', () => this.startJoinRoom());
+                this.libraryBtn.addEventListener('click', () => this.showLibrary());
+                
+                this.cancelUserInfo.addEventListener('click', () => this.hideModal(this.userInfoModal));
+                this.confirmUserInfo.addEventListener('click', () => this.saveUserInfo());
+                
+                this.cancelCreateRoom.addEventListener('click', () => this.hideModal(this.createRoomModal));
+                this.confirmCreateRoom.addEventListener('click', () => this.createRoom());
+                
+                this.cancelJoinRoom.addEventListener('click', () => this.hideModal(this.joinRoomModal));
+                this.confirmJoinRoom.addEventListener('click', () => this.joinRoom());
+                
+                this.messageInput.addEventListener('input', () => {
+                    this.messageInput.style.height = 'auto';
+                    this.messageInput.style.height = Math.min(this.messageInput.scrollHeight, 120) + 'px';
+                });
+                
+                this.messageInput.addEventListener('keypress', (e) => {
+                    if (e.key === 'Enter' && !e.shiftKey) {
+                        e.preventDefault();
+                        this.sendMessage();
+                    }
+                });
+                
+                this.sendButton.addEventListener('click', () => this.sendMessage());
+                
+                this.plusButton.addEventListener('click', () => {
+                    this.stickerPanel.style.display = this.stickerPanel.style.display === 'none' ? 'block' : 'none';
+                    this.createStickerPanel.style.display = 'none';
+                });
+                
+                this.photoButton.addEventListener('click', () => this.showPhotoOptions());
+                this.micButton.addEventListener('click', () => this.startRecording());
+                
+                this.createStickerBtn.addEventListener('click', () => {
+                    this.stickerPanel.style.display = 'none';
+                    this.createStickerPanel.style.display = 'block';
+                });
+                
+                this.selectImagesBtn.addEventListener('click', () => this.stickerImageInput.click());
+                this.stickerImageInput.addEventListener('change', (e) => this.handleStickerImages(e));
+                this.saveStickersBtn.addEventListener('click', () => this.saveStickers());
+                
+                this.videoFileInput.addEventListener('change', (e) => {
+                    if (e.target.files[0]) this.uploadVideo(e.target.files[0]);
+                });
+                
+                this.videoPlayer.addEventListener('play', () => this.onVideoPlay());
+                this.videoPlayer.addEventListener('pause', () => this.onVideoPause());
+                this.videoPlayer.addEventListener('seeked', () => this.onVideoSeek());
+                this.videoPlayer.addEventListener('ratechange', () => this.onVideoRateChange());
+                
+                this.uploadToLibraryBtn.addEventListener('click', () => this.libraryVideoInput.click());
+                this.libraryVideoInput.addEventListener('change', (e) => {
+                    if (e.target.files[0]) this.handleLibraryUpload(e.target.files[0]);
+                });
+                
+                this.inviteMenuItem.addEventListener('click', () => this.showInviteModal());
+                
+                this.fileInput.addEventListener('change', (e) => this.handleFileUpload(e, 'file'));
+                this.imageInput.addEventListener('change', (e) => this.handleFileUpload(e, 'image'));
+                this.audioInput.addEventListener('change', (e) => this.handleFileUpload(e, 'audio'));
+                
+                this.userNameInput.addEventListener('keypress', (e) => {
+                    if (e.key === 'Enter') this.saveUserInfo();
+                });
+                
+                this.roomNameInput.addEventListener('keypress', (e) => {
+                    if (e.key === 'Enter') this.createRoom();
+                });
+                
+                this.roomCodeInput.addEventListener('keypress', (e) => {
+                    if (e.key === 'Enter') this.joinRoom();
+                });
+                
+                this.youtubeSearchInput.addEventListener('keypress', (e) => {
+                    if (e.key === 'Enter') searchYouTubeVideos();
+                });
+            }
+
+            showLanding() {
+                this.landingPage.style.display = 'flex';
+                this.chatInterface.style.display = 'none';
+                this.hideAllModals();
+            }
+
+            showModal(modal) {
+                this.hideAllModals();
+                modal.classList.add('active');
+            }
+
+            hideModal(modal) {
+                modal.classList.remove('active');
+            }
+
+            hideAllModals() {
+                document.querySelectorAll('.modal').forEach(m => m.classList.remove('active'));
+            }
+
+            showLoading(text = 'İşlem yapılıyor...') {
+                this.loadingText.textContent = text;
+                this.loadingModal.classList.add('active');
+            }
+
+            hideLoading() {
+                this.loadingModal.classList.remove('active');
+            }
+
+            showError(message) {
+                alert('❌ ' + message);
+            }
+
+            showSuccess(message) {}
+
+            setTheme(theme) {
+                this.currentTheme = theme;
+                localStorage.setItem('theme', theme);
+                if (theme === 'light') {
+                    document.body.classList.add('light-theme');
+                } else {
+                    document.body.classList.remove('light-theme');
+                }
+            }
+
+            startCreateRoom() {
+                this.currentAction = 'create';
+                if (!this.userName) {
+                    this.showModal(this.userInfoModal);
+                    this.userNameInput.focus();
+                } else {
+                    this.showModal(this.createRoomModal);
+                    this.roomNameInput.focus();
+                }
+            }
+
+            startJoinRoom() {
+                this.currentAction = 'join';
+                if (!this.userName) {
+                    this.showModal(this.userInfoModal);
+                    this.userNameInput.focus();
+                } else {
+                    this.showModal(this.joinRoomModal);
+                    this.roomCodeInput.focus();
+                }
+            }
+
+            saveUserInfo() {
+                const userName = this.userNameInput.value.trim();
+                if (!userName) {
+                    this.showError('Kullanıcı adını gir!');
+                    return;
+                }
+                
+                this.userName = userName;
+                localStorage.setItem('userName', userName);
+                
+                const file = this.userPhotoInput.files[0];
+                if (file) {
+                    const reader = new FileReader();
+                    reader.onload = (e) => {
+                        this.userPhoto = e.target.result;
+                        localStorage.setItem('userPhoto', this.userPhoto);
+                        document.getElementById('menuUserName').innerHTML = `<i class="bi bi-person-circle"></i> ${this.userName}`;
+                        this.proceedWithAction();
+                    };
+                    reader.readAsDataURL(file);
+                } else {
+                    this.userPhoto = this.createDefaultAvatar(userName);
+                    localStorage.setItem('userPhoto', this.userPhoto);
+                    document.getElementById('menuUserName').innerHTML = `<i class="bi bi-person-circle"></i> ${this.userName}`;
+                    this.proceedWithAction();
+                }
+                
+                this.hideModal(this.userInfoModal);
+            }
+
+            proceedWithAction() {
+                if (this.currentAction === 'create') {
+                    this.showModal(this.createRoomModal);
+                    this.roomNameInput.focus();
+                } else if (this.currentAction === 'join') {
+                    this.showModal(this.joinRoomModal);
+                    this.roomCodeInput.focus();
+                }
+            }
+
+            connectSocket() {
+                this.showLoading('Sunucuya bağlanılıyor...');
+                
+                const serverUrl = window.location.hostname === 'localhost' 
+                    ? 'http://localhost:10000' 
+                    : window.location.origin;
+                
+                this.socket = io(serverUrl, {
+                    transports: ['websocket', 'polling'],
+                    reconnectionAttempts: 10,
+                    reconnectionDelay: 2000,
+                    timeout: 60000
+                });
+                
+                this.setupSocketEvents();
+            }
+
+            setupSocketEvents() {
+                this.socket.on('connect', () => {
+                    this.hideLoading();
+                    
+                    this.socket.emit('register-device', {
+                        deviceId: this.deviceId,
+                        userName: this.userName,
+                        userPhoto: this.userPhoto
+                    });
+                    
+                    setTimeout(() => {
+                        this.socket.emit('recover-session', { userId: this.userId });
+                    }, 1000);
+                    
+                    if (this.currentAction === 'create') {
+                        this.finalizeCreateRoom();
+                    } else if (this.currentAction === 'join') {
+                        this.finalizeJoinRoom();
+                    }
+                });
+
+                this.socket.on('device-registered', () => {});
+
+                this.socket.on('room-created', (data) => {
+                    this.roomCode = data.roomCode;
+                    this.roomName = data.roomName;
+                    this.isOwner = data.isOwner;
+                    this.isAdmin = data.isAdmin;
+                    
+                    this.menuUserName.innerHTML = `<i class="bi bi-person-circle"></i> ${this.userName}`;
+                    this.showChatInterface();
+                });
+
+                this.socket.on('room-joined', (data) => {
+                    this.roomCode = data.roomCode;
+                    this.roomName = data.roomName;
+                    this.isOwner = data.isOwner;
+                    this.isAdmin = data.isAdmin;
+                    
+                    this.menuUserName.innerHTML = `<i class="bi bi-person-circle"></i> ${this.userName}`;
+                    this.showChatInterface();
+                    
+                    if (data.previousMessages) {
+                        data.previousMessages.forEach(msg => this.displayMessage(msg));
+                    }
+                    
+                    if (data.stickers) {
+                        this.displayStickers(data.stickers);
+                    }
+                    
+                    if (data.activeVideo) {
+                        if (data.activeVideo.type === 'youtube') {
+                            this.displayYouTubeVideo(data.activeVideo.videoId, data.activeVideo.title);
+                        } else {
+                            this.displayVideo(data.activeVideo.url);
+                        }
+                    }
+                    
+                    if (data.videoVisible === false) {
+                        this.videoVisible = false;
+                        this.mainContainer.classList.add('video-hidden');
+                        this.toggleVideoBtn.innerHTML = '<i class="bi bi-chevron-down"></i>';
+                    }
+                    
+                    if (data.theme) {
+                        this.setTheme(data.theme);
+                    }
+                });
+
+                this.socket.on('session-recovered', (data) => {
+                    this.roomCode = data.roomCode;
+                    this.roomName = data.roomName;
+                    this.isOwner = data.isOwner;
+                    this.isAdmin = data.isAdmin;
+                    
+                    this.menuUserName.innerHTML = `<i class="bi bi-person-circle"></i> ${this.userName}`;
+                    this.showChatInterface();
+                    this.addSystemMessage('🔄 Oturum kurtarıldı, tekrar hoş geldin!');
+                });
+
+                this.socket.on('video-library-list', (videos) => {
+                    this.updateLibraryList(videos);
+                });
+
+                this.socket.on('interactions-list', (users) => {
+                    this.updateInviteList(users);
+                });
+
+                this.socket.on('invite-sent', () => {
+                    this.hideModal(this.inviteModal);
+                });
+
+                this.socket.on('invite-error', (data) => {
+                    this.showError(data.message);
+                });
+
+                this.socket.on('user-list-update', (users) => {
+                    this.updateUsersList(users);
+                    this.onlineCount.innerHTML = `<i class="bi bi-person-fill"></i> ${users.length} kişi`;
+                });
+
+                this.socket.on('user-joined', (data) => {
+                    this.addSystemMessage(`👋 ${data.userName} katıldı`);
+                });
+
+                this.socket.on('user-left', (data) => {
+                    this.addSystemMessage(`🚪 ${data.userName} ayrıldı`);
+                });
+
+                this.socket.on('video-uploaded', (data) => {
+                    this.displayVideo(data.videoUrl);
+                    this.addSystemMessage(`🎬 "${data.title}" yüklendi`);
+                });
+
+                this.socket.on('youtube-video-shared', (data) => {
+                    this.displayYouTubeVideo(data.videoId, data.title);
+                    this.addSystemMessage(`🎬 "${data.title}" paylaşıldı`);
+                });
+
+                this.socket.on('video-control', (data) => {
+                    if (!this.isOwner) this.syncVideoState(data);
+                });
+
+                this.socket.on('youtube-control', (data) => {
+                    if (!this.isOwner && this.youtubePlayer) this.syncYouTubeState(data);
+                });
+
+                this.socket.on('video-deleted', () => {
+                    this.hideVideo();
+                    this.addSystemMessage('🗑️ Video kapatıldı');
+                });
+
+                this.socket.on('video-visibility-changed', (data) => {
+                    this.videoVisible = data.visible;
+                    if (this.videoVisible) {
+                        this.mainContainer.classList.remove('video-hidden');
+                        this.toggleVideoBtn.innerHTML = '<i class="bi bi-chevron-up"></i>';
+                    } else {
+                        this.mainContainer.classList.add('video-hidden');
+                        this.toggleVideoBtn.innerHTML = '<i class="bi bi-chevron-down"></i>';
+                    }
+                });
+
+                this.socket.on('theme-changed', (theme) => {
+                    this.setTheme(theme);
+                });
+
+                this.socket.on('message', (msg) => {
+                    this.displayMessage(msg);
+                    setTimeout(() => {
+                        this.messagesContainer.scrollTop = this.messagesContainer.scrollHeight;
+                    }, 50);
+                });
+
+                this.socket.on('message-deleted', (data) => {
+                    this.removeMessage(data.messageId);
+                });
+
+                this.socket.on('secure-photo-view', (data) => {
+                    this.showSecurePhoto(data);
+                });
+
+                this.socket.on('stickers-updated', (data) => {
+                    this.displayStickers(data.stickers);
+                });
+
+                this.socket.on('play-pip-video', (data) => {
+                    this.showPipVideo(data.url, data.title);
+                });
+
+                this.socket.on('emergency-message', () => {
+                    this.addSystemMessage(`🚨 Acil durum! Oda siliniyor...`);
+                    setTimeout(() => window.location.reload(), 3000);
+                });
+
+                this.socket.on('error', (data) => {
+                    this.hideLoading();
+                    this.showError(data.message);
+                });
+
+                this.socket.on('disconnect', () => {
+                    this.addSystemMessage('🔌 Bağlantı koptu, yeniden bağlanılıyor...');
+                });
+
+                this.socket.on('reconnect', () => {
+                    this.addSystemMessage('✅ Yeniden bağlanıldı');
+                    this.registerDevice();
+                });
+            }
+
+            createRoom() {
+                const roomName = this.roomNameInput.value.trim();
+                const password = this.roomPasswordInput.value.trim();
+                
+                if (!roomName) {
+                    this.showError('Oda adını gir!');
+                    return;
+                }
+                
+                this.hideModal(this.createRoomModal);
+                this.showLoading('Oda oluşturuluyor...');
+                
+                this.pendingRoomData = { roomName, password };
+                this.currentAction = 'create';
+                
+                this.connectSocket();
+            }
+
+            finalizeCreateRoom() {
+                if (this.pendingRoomData) {
+                    this.socket.emit('create-room', {
+                        userName: this.userName,
+                        userPhoto: this.userPhoto,
+                        deviceId: this.deviceId,
+                        roomName: this.pendingRoomData.roomName,
+                        password: this.pendingRoomData.password || null
+                    });
+                    this.pendingRoomData = null;
+                }
+            }
+
+            joinRoom() {
+                const roomCode = this.roomCodeInput.value.trim().toUpperCase();
+                const password = this.joinPasswordInput.value.trim();
+                
+                if (!roomCode || roomCode.length !== 6) {
+                    this.showError('Geçerli 6 haneli kod gir!');
+                    return;
+                }
+                
+                this.hideModal(this.joinRoomModal);
+                this.showLoading('Odaya katılınıyor...');
+                
+                this.pendingRoomData = { roomCode, password };
+                this.currentAction = 'join';
+                
+                this.connectSocket();
+            }
+
+            finalizeJoinRoom() {
+                if (this.pendingRoomData) {
+                    this.socket.emit('join-room', {
+                        roomCode: this.pendingRoomData.roomCode,
+                        userName: this.userName,
+                        userPhoto: this.userPhoto,
+                        deviceId: this.deviceId,
+                        password: this.pendingRoomData.password || null
+                    });
+                    this.pendingRoomData = null;
+                }
+            }
+
+            showChatInterface() {
+                this.landingPage.style.display = 'none';
+                this.chatInterface.style.display = 'flex';
+                this.roomNameDisplay.textContent = this.roomName;
+                this.roomCodeDisplay.textContent = this.roomCode;
+                
+                if (this.isOwner) {
+                    this.videoControls.style.display = 'flex';
+                }
+                
+                this.messageInput.disabled = false;
+                this.messageInput.focus();
+            }
+
+            toggleVideoSection() {
+                if (!this.socket || !this.isOwner) return;
+                this.socket.emit('toggle-video-visibility');
+            }
+
+            showLibrary() {
+                this.hideAllModals();
+                this.videoLibraryModal.classList.add('active');
+                this.loadLibraryFilms();
+            }
+
+            async loadLibraryFilms() {
+                try {
+                    const res = await fetch('/api/library');
+                    const films = await res.json();
+                    
+                    let html = '';
+                    
+                    if (films.length === 0) {
+                        html = '<div style="text-align: center; padding: 40px; color: #8e8e8e;"><i class="bi bi-film" style="font-size: 48px; display: block; margin-bottom: 15px;"></i>📭 Kütüphane boş</div>';
+                    } else {
+                        films.forEach(film => {
+                            const date = new Date(film.uploadedAt).toLocaleDateString('tr-TR');
+                            html += `
+                                <div class="library-item" onclick="videoPlatform.playLibraryFilm('${film.id}')">
+                                    <div class="library-thumb">
+                                        <i class="bi bi-film"></i>
+                                    </div>
+                                    <div class="library-info">
+                                        <div class="library-title">${this.escapeHtml(film.title)}</div>
+                                        <div class="library-meta">
+                                            <i class="bi bi-person-fill"></i> ${film.uploadedBy} • 
+                                            <i class="bi bi-calendar-fill"></i> ${date}
+                                        </div>
+                                        <div class="library-expiry">
+                                            <i class="bi bi-hourglass-split"></i> ${this.formatTime(film.timeRemaining)} kaldı
+                                        </div>
+                                    </div>
+                                </div>
+                            `;
+                        });
+                    }
+                    
+                    this.libraryFilmList.innerHTML = html;
+                    
+                } catch (error) {
+                    this.libraryFilmList.innerHTML = '<div class="error-message"><i class="bi bi-exclamation-triangle-fill"></i> Kütüphane yüklenemedi</div>';
+                }
+            }
+
+            playLibraryFilm(filmId) {
+                if (!this.socket) {
+                    this.showError('Önce odaya katıl!');
+                    return;
+                }
+                
+                const inRoom = this.chatInterface.style.display === 'flex';
+                
+                this.socket.emit('play-library-film', {
+                    filmId: filmId,
+                    inRoom: inRoom
+                });
+                
+                this.videoLibraryModal.classList.remove('active');
+            }
+
+            async handleLibraryUpload(file) {
+                if (!file) return;
+                
+                if (!file.type.startsWith('video/')) {
+                    this.showError('Video dosyası seç!');
+                    return;
+                }
+                
+                const title = prompt('Film başlığını girin:', file.name.replace(/\.[^/.]+$/, ""));
+                if (!title) return;
+                
+                const formData = new FormData();
+                formData.append('video', file);
+                formData.append('title', title);
+                
+                this.showLoading('📚 Kütüphaneye yükleniyor...');
+                
+                try {
+                    const res = await fetch('/api/library/upload', {
+                        method: 'POST',
+                        body: formData
+                    });
+                    
+                    const data = await res.json();
+                    
+                    if (data.success) {
+                        this.loadLibraryFilms();
+                    } else {
+                        this.showError(data.error || 'Yükleme başarısız');
+                    }
+                } catch (error) {
+                    this.showError('Yükleme hatası!');
+                }
+                
+                this.hideLoading();
+            }
+
+            updateLibraryList(videos) {}
+
+            showInviteModal() {
+                if (!this.socket) {
+                    this.showError('Önce bir odaya katıl!');
+                    return;
+                }
+                
+                this.socket.emit('get-interactions', {
+                    deviceId: this.deviceId
+                });
+                
+                this.inviteModal.classList.add('active');
+            }
+
+            updateInviteList(users) {
                 let html = '';
                 
-                if (films.length === 0) {
-                    html = '<div style="text-align: center; padding: 40px; color: #8e8e8e;"><i class="bi bi-film" style="font-size: 48px; display: block; margin-bottom: 15px;"></i>📭 Kütüphane boş</div>';
+                if (users.length === 0) {
+                    html = '<div style="text-align: center; padding: 40px; color: #8e8e8e;"><i class="bi bi-people" style="font-size: 48px; display: block; margin-bottom: 15px;"></i>👥 Henüz etkileşim kurduğun kişi yok</div>';
                 } else {
-                    films.forEach(film => {
-                        const date = new Date(film.uploadedAt).toLocaleDateString('tr-TR');
+                    users.forEach(user => {
+                        const lastSeen = new Date(user.lastSeen).toLocaleDateString('tr-TR');
                         html += `
-                            <div class="library-item" onclick="videoPlatform.playLibraryFilm('${film.id}')">
-                                <div class="library-thumb">
-                                    <i class="bi bi-film"></i>
-                                </div>
-                                <div class="library-info">
-                                    <div class="library-title">${this.escapeHtml(film.title)}</div>
-                                    <div class="library-meta">
-                                        <i class="bi bi-person-fill"></i> ${film.uploadedBy} • 
-                                        <i class="bi bi-calendar-fill"></i> ${date}
+                            <div class="invite-item" onclick="videoPlatform.sendInvite('${user.deviceId}', '${this.escapeHtml(user.userName)}')">
+                                <img src="${user.userPhoto || this.createDefaultAvatar(user.userName)}" class="invite-avatar" alt="">
+                                <div class="invite-info">
+                                    <div class="invite-name">
+                                        ${user.isOnline ? '<span class="online-dot"></span>' : ''}
+                                        ${this.escapeHtml(user.userName)}
                                     </div>
-                                    <div class="library-expiry">
-                                        <i class="bi bi-hourglass-split"></i> ${this.formatTime(film.timeRemaining)} kaldı
+                                    <div class="invite-status">
+                                        <i class="bi bi-clock-fill"></i> ${user.isOnline ? 'Çevrimiçi' : 'Son ' + lastSeen}
                                     </div>
                                 </div>
+                                <button class="btn btn-primary" style="padding: 10px 20px; font-size: 14px; width: auto;">
+                                    <i class="bi bi-send-fill"></i> Davet Et
+                                </button>
                             </div>
                         `;
                     });
                 }
                 
-                this.libraryFilmList.innerHTML = html;
-                
-            } catch (error) {
-                console.error('Kütüphane yüklenemedi:', error);
-                this.libraryFilmList.innerHTML = '<div class="error-message"><i class="bi bi-exclamation-triangle-fill"></i> Kütüphane yüklenemedi</div>';
+                this.inviteList.innerHTML = html;
             }
-        }
 
-        playLibraryFilm(filmId) {
-            if (!this.socket) {
-                this.showError('Önce odaya katıl!');
-                return;
-            }
-            
-            const inRoom = this.chatInterface.style.display === 'flex';
-            
-            this.socket.emit('play-library-film', {
-                filmId: filmId,
-                inRoom: inRoom
-            });
-            
-            this.videoLibraryModal.classList.remove('active');
-        }
-
-        async handleLibraryUpload(file) {
-            if (!file) return;
-            
-            if (!file.type.startsWith('video/')) {
-                this.showError('Video dosyası seç!');
-                return;
-            }
-            
-            const title = prompt('Film başlığını girin:', file.name.replace(/\.[^/.]+$/, ""));
-            if (!title) return;
-            
-            const formData = new FormData();
-            formData.append('video', file);
-            formData.append('title', title);
-            
-            this.showLoading('📚 Kütüphaneye yükleniyor... (Bu biraz sürebilir)');
-            
-            try {
-                const res = await fetch('/api/library/upload', {
-                    method: 'POST',
-                    body: formData
-                });
-                
-                const data = await res.json();
-                
-                if (data.success) {
-                    this.showSuccess('✅ Film kütüphaneye eklendi!');
-                    this.loadLibraryFilms();
-                } else {
-                    this.showError(data.error || 'Yükleme başarısız');
+            sendInvite(toDeviceId, toUserName) {
+                if (!this.socket || !this.roomCode) {
+                    this.showError('Önce bir oda oluştur veya katıl!');
+                    return;
                 }
-            } catch (error) {
-                this.showError('Yükleme hatası!');
+                
+                this.socket.emit('send-invite', {
+                    fromDeviceId: this.deviceId,
+                    toDeviceId: toDeviceId,
+                    roomCode: this.roomCode,
+                    roomName: this.roomName,
+                    fromUserName: this.userName
+                });
             }
-            
-            this.hideLoading();
-        }
 
-        updateLibraryList(videos) {
-            // Arka planda güncelle
-        }
-
-        showInviteModal() {
-            if (!this.socket) {
-                this.showError('Önce bir odaya katıl!');
-                return;
-            }
-            
-            this.socket.emit('get-interactions', {
-                deviceId: this.deviceId
-            });
-            
-            this.hideModal(this.videoLibraryModal);
-            this.inviteModal.classList.add('active');
-        }
-
-        updateInviteList(users) {
-            let html = '';
-            
-            if (users.length === 0) {
-                html = '<div style="text-align: center; padding: 40px; color: #8e8e8e;"><i class="bi bi-people" style="font-size: 48px; display: block; margin-bottom: 15px;"></i>👥 Henüz etkileşim kurduğun kişi yok</div>';
-            } else {
-                users.forEach(user => {
-                    const lastSeen = new Date(user.lastSeen).toLocaleDateString('tr-TR');
-                    html += `
-                        <div class="invite-item" onclick="videoPlatform.sendInvite('${user.deviceId}', '${this.escapeHtml(user.userName)}')">
-                            <img src="${user.userPhoto || this.createDefaultAvatar(user.userName)}" class="invite-avatar" alt="">
-                            <div class="invite-info">
-                                <div class="invite-name">
-                                    ${user.isOnline ? '<span class="online-dot"></span>' : ''}
-                                    ${this.escapeHtml(user.userName)}
-                                </div>
-                                <div class="invite-status">
-                                    <i class="bi bi-clock-fill"></i> ${user.isOnline ? 'Çevrimiçi' : 'Son ' + lastSeen}
-                                </div>
-                            </div>
-                            <button class="btn btn-primary" style="padding: 10px 20px; font-size: 14px; width: auto;">
-                                <i class="bi bi-send-fill"></i> Davet Et
+            showPhotoOptions() {
+                const modal = document.createElement('div');
+                modal.className = 'modal active';
+                modal.innerHTML = `
+                    <div class="modal-content">
+                        <h2><i class="bi bi-camera-fill"></i> Fotoğraf Gönder</h2>
+                        <div class="photo-options">
+                            <button class="photo-option-btn secure-photo-btn" id="securePhotoOption">
+                                <i class="bi bi-shield-lock-fill"></i>
+                                <span>Tek Kullanımlık</span>
+                                <small>8 saniye görünür</small>
+                            </button>
+                            <button class="photo-option-btn normal-photo-btn" id="normalPhotoOption">
+                                <i class="bi bi-image-fill"></i>
+                                <span>Normal</span>
+                                <small>Kalıcı</small>
                             </button>
                         </div>
-                    `;
-                });
-            }
-            
-            this.inviteList.innerHTML = html;
-        }
-
-        sendInvite(toDeviceId, toUserName) {
-            if (!this.socket || !this.roomCode) {
-                this.showError('Önce bir oda oluştur veya katıl!');
-                return;
-            }
-            
-            this.socket.emit('send-invite', {
-                fromDeviceId: this.deviceId,
-                toDeviceId: toDeviceId,
-                roomCode: this.roomCode,
-                roomName: this.roomName,
-                fromUserName: this.userName
-            });
-        }
-
-        showPhotoOptions() {
-            const modal = document.createElement('div');
-            modal.className = 'modal active';
-            modal.innerHTML = `
-                <div class="modal-content">
-                    <h2><i class="bi bi-camera-fill"></i> Fotoğraf Gönder</h2>
-                    <div class="photo-options">
-                        <button class="photo-option-btn secure-photo-btn" id="securePhotoOption">
-                            <i class="bi bi-shield-lock-fill"></i>
-                            <span>Tek Kullanımlık</span>
-                            <small>8 saniye görünür</small>
-                        </button>
-                        <button class="photo-option-btn normal-photo-btn" id="normalPhotoOption">
-                            <i class="bi bi-image-fill"></i>
-                            <span>Normal</span>
-                            <small>Kalıcı</small>
-                        </button>
+                        <div class="button-group">
+                            <button class="btn btn-secondary" onclick="this.closest('.modal').remove()">
+                                <i class="bi bi-x-lg"></i> İptal
+                            </button>
+                        </div>
                     </div>
-                    <div class="button-group">
-                        <button class="btn btn-secondary" onclick="this.closest('.modal').remove()">
-                            <i class="bi bi-x-lg"></i> İptal
-                        </button>
-                    </div>
-                </div>
-            `;
-            
-            document.body.appendChild(modal);
-            
-            document.getElementById('securePhotoOption').onclick = () => {
-                modal.remove();
-                this.imageInput.click();
-                this.pendingPhotoType = 'secure';
-            };
-            
-            document.getElementById('normalPhotoOption').onclick = () => {
-                modal.remove();
-                this.imageInput.click();
-                this.pendingPhotoType = 'normal';
-            };
-        }
+                `;
+                
+                document.body.appendChild(modal);
+                
+                document.getElementById('securePhotoOption').onclick = () => {
+                    modal.remove();
+                    this.imageInput.click();
+                    this.pendingPhotoType = 'secure';
+                };
+                
+                document.getElementById('normalPhotoOption').onclick = () => {
+                    modal.remove();
+                    this.imageInput.click();
+                    this.pendingPhotoType = 'normal';
+                };
+            }
 
-        async uploadVideo(file) {
-            if (!file || !this.isOwner) {
-                this.showError('Video yüklemek için oda sahibi olmalısın!');
-                return;
-            }
-            
-            if (!file.type.startsWith('video/')) {
-                this.showError('Video dosyası seç!');
-                return;
-            }
-            
-            if (file.size > 5 * 1024 * 1024 * 1024) {
-                this.showError('Video 5GB\'dan küçük olmalı!');
-                return;
-            }
-            
-            this.showLoading('📤 Video yükleniyor... (Direkt ImageKit\'e)');
-            
-            try {
-                // ImageKit auth al
-                const authRes = await fetch('/api/imagekit-auth');
-                const auth = await authRes.json();
+            async uploadVideo(file) {
+                if (!file || !this.isOwner) {
+                    this.showError('Video yüklemek için oda sahibi olmalısın!');
+                    return;
+                }
                 
-                // ImageKit'i başlat
-                const imagekit = new ImageKit({
-                    publicKey: 'public_mfwvdT7bS9kxwL5YpRv5YY9/W4Q=',
-                    urlEndpoint: 'https://ik.imagekit.io/5v8xlfyfa',
-                    authenticationEndpoint: '/api/imagekit-auth'
-                });
+                if (!file.type.startsWith('video/')) {
+                    this.showError('Video dosyası seç!');
+                    return;
+                }
                 
-                // Direkt upload
-                imagekit.upload({
-                    file: file,
-                    fileName: file.name,
-                    folder: '/room_videos',
-                    tags: [this.roomCode, this.userName],
-                    useUniqueFileName: true,
-                    onProgress: (progress) => {
-                        const percent = Math.round((progress.loaded / progress.total) * 100);
-                        this.loadingText.textContent = `📤 Yükleniyor: %${percent}`;
-                    }
-                }, (err, result) => {
-                    if (err) {
-                        console.error('ImageKit hatası:', err);
-                        this.hideLoading();
-                        this.showError('Yükleme başarısız!');
-                        return;
-                    }
+                this.showLoading('📤 Video yükleniyor...');
+                
+                try {
+                    const authRes = await fetch('/api/imagekit-auth');
+                    const auth = await authRes.json();
                     
-                    this.socket.emit('upload-room-video', {
-                        url: result.url,
-                        fileId: result.fileId,
-                        title: file.name,
-                        fileSize: file.size
+                    const imagekit = new ImageKit({
+                        publicKey: 'public_mfwvdT7bS9kxwL5YpRv5YY9/W4Q=',
+                        urlEndpoint: 'https://ik.imagekit.io/5v8xlfyfa',
+                        authenticationEndpoint: '/api/imagekit-auth'
                     });
                     
-                    this.hideLoading();
-                    this.showSuccess('✅ Video yüklendi!');
-                });
-                
+                    imagekit.upload({
+                        file: file,
+                        fileName: file.name,
+                        folder: '/room_videos',
+                        tags: [this.roomCode, this.userName],
+                        useUniqueFileName: true
+                    }, (err, result) => {
+                        if (err) {
+                            this.hideLoading();
+                            this.showError('Yükleme başarısız!');
+                            return;
+                        }
+                        
+                        this.socket.emit('upload-room-video', {
+                            url: result.url,
+                            fileId: result.fileId,
+                            title: file.name,
+                            fileSize: file.size
+                        });
+                        
+                        this.hideLoading();
+                    });
+                    
                 } catch (error) {
-                    console.error('Video yükleme hatası:', error);
                     this.hideLoading();
                     this.showError('Yükleme başarısız!');
                 }
@@ -2460,7 +3127,6 @@
                 this.videoPlayer.style.display = 'block';
                 this.youtubeContainer.style.display = 'none';
                 this.videoPlayer.src = url;
-                this.videoPlayer.load();
                 
                 if (this.youtubePlayer) {
                     this.youtubePlayer.destroy();
@@ -2486,15 +3152,11 @@
                         'playsinline': 1,
                         'enablejsapi': 1,
                         'modestbranding': 1,
-                        'rel': 0,
-                        'iv_load_policy': 3
+                        'rel': 0
                     },
                     events: {
-                        'onReady': (event) => {
-                            console.log('YouTube player hazır');
-                            if (this.isOwner) {
-                                this.videoControls.style.display = 'flex';
-                            }
+                        'onReady': () => {
+                            if (this.isOwner) this.videoControls.style.display = 'flex';
                         },
                         'onStateChange': (event) => {
                             if (this.isOwner) {
@@ -2514,7 +3176,6 @@
                 this.noVideo.style.display = 'block';
                 this.videoPlayer.style.display = 'none';
                 this.youtubeContainer.style.display = 'none';
-                this.videoPlayer.pause();
                 this.videoPlayer.src = '';
                 
                 if (this.youtubePlayer) {
@@ -2687,7 +3348,6 @@
                         this.socket.emit('message', { text: '🚨', type: 'emergency' });
                     }
                 } else if (this.currentReplyTo) {
-                    // Yanıtlanan mesaj varsa
                     this.socket.emit('reply-message', {
                         replyToId: this.currentReplyTo.id,
                         text: text,
@@ -2709,9 +3369,12 @@
                 messageEl.className = `message ${isOwn ? 'own' : ''}`;
                 messageEl.setAttribute('data-message-id', msg.id);
                 
+                const avatarUrl = msg.userPhoto && msg.userPhoto.startsWith('data:') 
+                    ? msg.userPhoto 
+                    : this.createDefaultAvatar(msg.userName);
+                
                 let contentHtml = '';
                 
-                // Yanıtlanan mesaj varsa
                 if (msg.replyTo) {
                     const repliedMsg = this.findMessageById(msg.replyTo);
                     if (repliedMsg) {
@@ -2746,21 +3409,10 @@
                             <source src="${msg.fileUrl}">
                         </audio>
                     `;
-                } else if (msg.type === 'file') {
-                    contentHtml += `
-                        ${msg.text ? `<div class="message-text">${this.escapeHtml(msg.text)}</div>` : ''}
-                        <div class="file-attachment">
-                            <i class="bi bi-file-earmark-fill"></i>
-                            <a href="${msg.fileUrl}" target="_blank" style="color: #0095F6; text-decoration: none;">
-                                ${msg.fileName} (${this.formatFileSize(msg.fileSize)})
-                            </a>
-                        </div>
-                    `;
                 } else {
                     contentHtml += `<div class="message-text">${this.escapeHtml(msg.text)}</div>`;
                 }
                 
-                // Tepkiler varsa
                 if (msg.reactions && msg.reactions.length > 0) {
                     const reactionCounts = {};
                     msg.reactions.forEach(r => {
@@ -2776,7 +3428,7 @@
                 }
                 
                 messageEl.innerHTML = `
-                    <img src="${msg.userPhoto || this.createDefaultAvatar(msg.userName)}" class="message-avatar" alt="">
+                    <img src="${avatarUrl}" class="message-avatar" alt="" onerror="this.src='${this.createDefaultAvatar(msg.userName)}'">
                     <div class="message-content">
                         <div class="message-header">
                             <div class="message-sender">${this.escapeHtml(msg.userName)}</div>
@@ -2830,12 +3482,10 @@
             }
 
             showMessageActions(event, element, msg) {
-                // Önceki menüleri temizle
                 document.querySelectorAll('.reaction-menu, .message-actions').forEach(el => el.remove());
                 
                 const rect = element.getBoundingClientRect();
                 
-                // Tepki menüsü
                 const reactionMenu = document.createElement('div');
                 reactionMenu.className = 'reaction-menu';
                 reactionMenu.style.top = Math.max(10, rect.top - 70) + 'px';
@@ -2856,13 +3506,11 @@
                 
                 document.body.appendChild(reactionMenu);
                 
-                // İşlem menüsü
                 const actionMenu = document.createElement('div');
                 actionMenu.className = 'message-actions';
                 actionMenu.style.top = Math.min(rect.top, window.innerHeight - 180) + 'px';
                 actionMenu.style.left = Math.min(rect.right + 10, window.innerWidth - 180) + 'px';
                 
-                // Yanıtla butonu
                 const replyItem = document.createElement('div');
                 replyItem.className = 'action-item reply';
                 replyItem.innerHTML = '<i class="bi bi-reply-fill"></i> Yanıtla';
@@ -2875,7 +3523,6 @@
                 };
                 actionMenu.appendChild(replyItem);
                 
-                // Sadece kendi mesajlarına sil butonu
                 if (msg.userName === this.userName) {
                     const deleteItem = document.createElement('div');
                     deleteItem.className = 'action-item delete';
@@ -2890,7 +3537,6 @@
                 
                 document.body.appendChild(actionMenu);
                 
-                // Tıklandığında menüleri kapat
                 setTimeout(() => {
                     const closeMenus = (e) => {
                         if (!e.target.closest('.reaction-menu') && !e.target.closest('.message-actions')) {
@@ -2956,7 +3602,6 @@
                         img.src = e.target.result;
                         img.className = 'sticker-item';
                         img.onclick = () => {
-                            // Önizlemede tıklanınca çıkartma gönder
                             this.sendSticker({ imageUrl: e.target.result });
                         };
                         this.selectedImagesPreview.appendChild(img);
@@ -2979,8 +3624,6 @@
                 this.selectedImagesPreview.innerHTML = '';
                 this.saveStickersBtn.style.display = 'none';
                 this.stickerImageInput.value = '';
-                
-                this.showSuccess('✅ Çıkartmalar kaydedildi!');
             }
 
             displayStickers(stickers) {
@@ -3084,32 +3727,27 @@
                     
                     this.mediaRecorder.start();
                     
-                    // Kayıt göstergesi
                     const indicator = document.createElement('div');
                     indicator.id = 'recordingIndicator';
-                    indicator.style.cssText = `
-                        position: fixed;
-                        top: 50%;
-                        left: 50%;
-                        transform: translate(-50%, -50%);
-                        background: #ff3b30;
-                        color: white;
-                        padding: 30px 40px;
-                        border-radius: 30px;
-                        z-index: 10000;
-                        text-align: center;
-                        box-shadow: 0 10px 40px rgba(0,0,0,0.5);
-                        border: 2px solid rgba(255,255,255,0.3);
-                        backdrop-filter: blur(10px);
-                    `;
                     indicator.innerHTML = `
-                        <i class="bi bi-mic-fill" style="font-size: 48px; display: block; margin-bottom: 15px;"></i>
-                        <div style="font-size: 20px; margin-bottom: 20px;">🎤 Kayıt yapılıyor...</div>
+                        <i class="bi bi-mic-fill"></i>
+                        <div id="recordingTimer">00:00</div>
                         <button class="btn" onclick="videoPlatform.stopRecording()" style="background: #fff; color: #000; padding: 12px 30px; border-radius: 50px; font-size: 16px;">
                             <i class="bi bi-stop-fill"></i> Durdur
                         </button>
                     `;
                     document.body.appendChild(indicator);
+                    
+                    let seconds = 0;
+                    const timer = setInterval(() => {
+                        seconds++;
+                        const mins = Math.floor(seconds / 60);
+                        const secs = seconds % 60;
+                        document.getElementById('recordingTimer').textContent = 
+                            `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+                    }, 1000);
+                    
+                    this.mediaRecorder.timer = timer;
                     
                 } catch (error) {
                     this.showError('Mikrofon erişimi yok!');
@@ -3118,6 +3756,7 @@
 
             stopRecording() {
                 if (this.mediaRecorder && this.mediaRecorder.state === 'recording') {
+                    clearInterval(this.mediaRecorder.timer);
                     this.mediaRecorder.stop();
                 }
             }
@@ -3161,11 +3800,6 @@
                 this.pipVideo.classList.add('active');
                 this.pipVideoPlayer.src = url;
                 this.pipVideoPlayer.play();
-                
-                // 24 saat sonra otomatik kapat
-                setTimeout(() => {
-                    this.closePipVideo();
-                }, 24 * 60 * 60 * 1000);
             }
 
             closePipVideo() {
@@ -3208,9 +3842,10 @@
             }
 
             createDefaultAvatar(username) {
-                const colors = ['#405DE6', '#5851DB', '#833AB4', '#C13584', '#E1306C', '#FD1D1D'];
+                const firstLetter = username ? username.charAt(0).toUpperCase() : '?';
+                const colors = ['405DE6', '5851DB', '833AB4', 'C13584', 'E1306C', 'FD1D1D'];
                 const color = colors[Math.floor(Math.random() * colors.length)];
-                return `data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='100' height='100' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' fill='${color}'/%3E%3Ctext x='50' y='70' font-family='Arial' font-size='50' text-anchor='middle' fill='white'%3E${username?.charAt(0).toUpperCase() || '?'}%3C/text%3E%3C/svg%3E`;
+                return `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 100 100"><circle cx="50" cy="50" r="50" fill="#${color}"/><text x="50" y="70" font-family="Arial" font-size="50" text-anchor="middle" fill="white">${firstLetter}</text></svg>`;
             }
 
             formatTime(seconds) {
@@ -3223,14 +3858,6 @@
                 return `${hours}s ${mins}d`;
             }
 
-            formatFileSize(bytes) {
-                if (bytes === 0) return '0 Bytes';
-                const k = 1024;
-                const sizes = ['Bytes', 'KB', 'MB', 'GB'];
-                const i = Math.floor(Math.log(bytes) / Math.log(k));
-                return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
-            }
-
             escapeHtml(text) {
                 const div = document.createElement('div');
                 div.textContent = text;
@@ -3238,7 +3865,6 @@
             }
         }
 
-        // GLOBAL FONKSİYONLAR
         let videoPlatform;
         const youTubeSearch = new YouTubeSearch();
 
@@ -3290,7 +3916,6 @@
             if (videoPlatform) videoPlatform.closePipVideo();
         }
 
-        // YOUTUBE FONKSİYONLARI
         async function searchYouTubeVideos() {
             const query = document.getElementById('youtubeSearchInput').value.trim();
             if (!query) {
@@ -3379,11 +4004,9 @@
             document.getElementById('youtubeSearchModal').classList.remove('active');
         }
 
-        // SAYFA YÜKLENDİĞİNDE
         document.addEventListener('DOMContentLoaded', () => {
             videoPlatform = new VideoPlatform();
             
-            // URL'den oda kodu varsa
             const params = new URLSearchParams(window.location.search);
             const roomCode = params.get('room');
             if (roomCode) {
@@ -3394,7 +4017,6 @@
             }
         });
 
-        // YOUTUBE API HAZIR OLDUĞUNDA
         function onYouTubeIframeAPIReady() {
             console.log('✅ YouTube API hazır');
         }
