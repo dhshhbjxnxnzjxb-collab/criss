@@ -13,42 +13,42 @@ const app = express();
 const server = http.createServer(app);
 const PORT = process.env.PORT || 10000;
 
-// 🔐 VAPID Keys for Push Notifications
+// 🔐 VAPID Keys
 const vapidKeys = {
-    publicKey: process.env.VAPID_PUBLIC_KEY || 'BBGzAdGx9mWFYT3kfBOD11L_fiNw6cCa5HZunw9Z7BUFN3g9SMT_aO0I6_s6Q9SWzPYRqntVl2cIGq0Z7YiDdeE',
-    privateKey: process.env.VAPID_PRIVATE_KEY || 'Xsk-F8uNP2d7RRpj6rleFRXN27t1CwNKF0eHjHSS3rk'
+    publicKey: process.env.VAPID_PUBLIC_KEY,
+    privateKey: process.env.VAPID_PRIVATE_KEY
 };
 
 webpush.setVapidDetails(
-    'mailto:crissahahhaha@gmail.com',
+    'mailto:' + process.env.VAPID_EMAIL,
     vapidKeys.publicKey,
     vapidKeys.privateKey
 );
 
-// 🎯 ImageKit.io Konfigürasyonu
+// 🎯 ImageKit
 const imagekit = new ImageKit({
-    publicKey: process.env.IMAGEKIT_PUBLIC_KEY || 'public_mfwvdT7bS9kxwL5YpRv5YY9/W4Q=',
-    privateKey: process.env.IMAGEKIT_PRIVATE_KEY || 'private_jgXy2tt8CCzfQoR6bN3y/KfWjtE=',
-    urlEndpoint: process.env.IMAGEKIT_URL_ENDPOINT || 'https://ik.imagekit.io/5v8xlfyfa'
+    publicKey: process.env.IMAGEKIT_PUBLIC_KEY,
+    privateKey: process.env.IMAGEKIT_PRIVATE_KEY,
+    urlEndpoint: process.env.IMAGEKIT_URL_ENDPOINT
 });
 
-// 📊 VERİTABANI (Bellek içi)
-const rooms = new Map();                // Aktif odalar
-const users = new Map();                // Aktif kullanıcılar (socket.id -> user)
-const messages = new Map();             // Oda mesajları
-const userStickers = new Map();          // Çıkartmalar
-const securePhotos = new Map();          // Güvenli fotoğraflar
-const videoLibrary = new Map();          // Admin videoları (telifsiz)
-const roomVideos = new Map();            // Oda içi videolar (geçici)
-const deviceRelations = new Map();       // Device ID ilişkileri
-const pushSubscriptions = new Map();     // Bildirim abonelikleri
-const userProfiles = new Map();          // Kullanıcı profilleri (deviceId -> profile)
-const userSessions = new Map();          // Oturum bilgileri
+// 📊 VERİTABANI
+const rooms = new Map();
+const users = new Map();
+const messages = new Map();
+const userStickers = new Map();
+const securePhotos = new Map();
+const videoLibrary = new Map();
+const roomVideos = new Map();
+const deviceRelations = new Map();
+const pushSubscriptions = new Map();
+const userProfiles = new Map();
+const userSessions = new Map();
 
-// 👑 ADMIN IP (Kendi IP'nle değiştir)
-const ADMIN_IP = '151.250.0.232';
+// 👑 ADMIN DEVICE ID - .env'den alınır
+const ADMIN_DEVICE_ID = process.env.ADMIN_DEVICE_ID;
 
-// 🔄 Self-ping (Render uyku engelleme)
+// 🔄 Self-ping
 setInterval(() => {
     const https = require('https');
     const http = require('http');
@@ -60,7 +60,7 @@ setInterval(() => {
     }).on('error', (err) => {});
 }, 60 * 1000);
 
-// 🧹 Temizlik işleri (her saat)
+// 🧹 Temizlik işleri
 const cleanupJob = new CronJob('0 * * * *', () => {
     console.log('🧹 Temizlik başladı...');
     const now = Date.now();
@@ -69,7 +69,6 @@ const cleanupJob = new CronJob('0 * * * *', () => {
         if (video.expiresAt < now) {
             imagekit.deleteFile(video.fileId, () => {});
             videoLibrary.delete(id);
-            console.log(`📚 Kütüphane videosu silindi: ${video.title}`);
         }
     });
     
@@ -92,11 +91,8 @@ const cleanupJob = new CronJob('0 * * * *', () => {
             messages.delete(code);
             userStickers.delete(code);
             securePhotos.delete(code);
-            console.log(`🧹 Boş oda silindi: ${code}`);
         }
     });
-    
-    console.log(`✅ Temizlik tamamlandı - Kütüphane: ${videoLibrary.size} video`);
 });
 
 cleanupJob.start();
@@ -112,7 +108,7 @@ app.use(express.json({ limit: '5gb' }));
 app.use(express.urlencoded({ extended: true, limit: '5gb' }));
 app.use(express.static(path.join(__dirname, 'public')));
 
-// 📁 Multer config
+// 📁 Multer
 const upload = multer({ 
     storage: multer.memoryStorage(),
     limits: { fileSize: 5 * 1024 * 1024 * 1024 },
@@ -141,13 +137,10 @@ function generateUserColor(username) {
     return colors[index % colors.length];
 }
 
-// server.js'deki generateDefaultAvatar fonksiyonunu DEĞİŞTİR:
 function generateDefaultAvatar(username) {
-    // Direkt PNG linki - Her zaman çalışır
-    return 'https://ik.imagekit.io/5v8xlfyfa/default-avatar.png';
+    const name = encodeURIComponent(username || 'Kullanici');
+    return `https://ui-avatars.com/api/?name=${name}&background=0095F6&color=fff&length=1&bold=true&size=128`;
 }
-
-// index.html'deki createDefaultAvatar fonksiyonunu DEĞİŞTİR:
 
 function extractYouTubeId(url) {
     const regex = /(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([^"&?\/\s]{11})/;
@@ -216,13 +209,6 @@ function recordInteraction(deviceId1, deviceId2) {
 
 io.on('connection', (socket) => {
     console.log('✅ Yeni bağlantı:', socket.id);
-    
-    let clientIp = socket.handshake.address;
-    const forwardedFor = socket.handshake.headers['x-forwarded-for'];
-    if (forwardedFor) clientIp = forwardedFor.split(',')[0].trim();
-    
-    const isAdmin = clientIp === ADMIN_IP;
-    if (isAdmin) console.log('👑 Admin girişi yapıldı!');
     
     let currentUser = null;
     let currentRoomCode = null;
@@ -330,6 +316,10 @@ io.on('connection', (socket) => {
             return;
         }
         
+        // Admin kontrolü - deviceId'ye göre
+        const isAdmin = (deviceId === ADMIN_DEVICE_ID);
+        if (isAdmin) console.log('👑 Admin girişi yapıldı!');
+        
         let roomCode = generateRoomCode();
         while (rooms.has(roomCode)) roomCode = generateRoomCode();
         
@@ -387,7 +377,7 @@ io.on('connection', (socket) => {
         socket.emit('video-library-list', getLibraryList());
         updateUserList(roomCode);
         
-        console.log(`✅ Oda oluşturuldu: ${roomCode} - Sahip: ${userName}`);
+        console.log(`✅ Oda oluşturuldu: ${roomCode} - Sahip: ${userName} - Admin: ${isAdmin}`);
     });
 
     socket.on('join-room', (data) => {
@@ -403,6 +393,10 @@ io.on('connection', (socket) => {
             socket.emit('error', { message: 'Şifre yanlış' });
             return;
         }
+        
+        // Admin kontrolü - deviceId'ye göre
+        const isAdmin = (deviceId === ADMIN_DEVICE_ID);
+        if (isAdmin) console.log('👑 Admin odaya katıldı!');
         
         currentUser = {
             id: socket.id,
@@ -449,7 +443,7 @@ io.on('connection', (socket) => {
         
         updateUserList(roomCode);
         
-        console.log(`✅ Kullanıcı katıldı: ${userName} -> ${roomCode}`);
+        console.log(`✅ Kullanıcı katıldı: ${userName} -> ${roomCode} - Admin: ${isAdmin}`);
     });
 
     socket.on('recover-session', (data) => {
@@ -584,6 +578,41 @@ io.on('connection', (socket) => {
         }
     });
 
+    socket.on('add-reaction', (data) => {
+        if (!currentRoomCode || !currentUser) return;
+        
+        const { messageId, reaction } = data;
+        const roomMessages = messages.get(currentRoomCode) || [];
+        const messageIndex = roomMessages.findIndex(m => m.id === messageId);
+        
+        if (messageIndex !== -1) {
+            if (!roomMessages[messageIndex].reactions) {
+                roomMessages[messageIndex].reactions = [];
+            }
+            
+            // Aynı kullanıcının aynı emojiyi tekrar eklemesini engelle
+            const existingReactionIndex = roomMessages[messageIndex].reactions.findIndex(
+                r => r.userId === currentUser.deviceId && r.emoji === reaction
+            );
+            
+            if (existingReactionIndex === -1) {
+                roomMessages[messageIndex].reactions.push({ 
+                    userId: currentUser.deviceId, 
+                    emoji: reaction,
+                    userName: currentUser.userName
+                });
+                messages.set(currentRoomCode, roomMessages);
+                
+                io.to(currentRoomCode).emit('reaction-added', { 
+                    messageId, 
+                    reaction, 
+                    userId: currentUser.deviceId,
+                    userName: currentUser.userName
+                });
+            }
+        }
+    });
+
     socket.on('view-secure-photo', (data) => {
         if (!currentRoomCode || !currentUser) return;
         
@@ -619,49 +648,47 @@ io.on('connection', (socket) => {
         }
     });
 
-// 📤 Video yükleme (oda içi - HERKES yükleyebilir, admin kontrolü KALDIR)
-socket.on('upload-room-video', (data) => {
-    // SADECE oda sahibi kontrolü, admin kontrolü YOK!
-    if (!currentRoomCode || !currentUser || !currentUser.isOwner) {
-        socket.emit('error', { message: 'Video yüklemek için oda sahibi olmalısınız!' });
-        return;
-    }
-    
-    const { url, fileId, title, fileSize } = data;
-    const room = rooms.get(currentRoomCode);
-    
-    if (room) {
-        const videoId = 'room_' + Date.now();
-        roomVideos.set(videoId, {
-            id: videoId,
-            url,
-            fileId,
-            title,
-            uploadedBy: currentUser.userName,
-            uploadedAt: Date.now(),
-            expiresAt: Date.now() + (24 * 60 * 60 * 1000),
-            roomCode: currentRoomCode
-        });
+    socket.on('upload-room-video', (data) => {
+        if (!currentRoomCode || !currentUser || !currentUser.isOwner) {
+            socket.emit('error', { message: 'Video yüklemek için oda sahibi olmalısınız!' });
+            return;
+        }
         
-        room.video = {
-            type: 'room',
-            url,
-            fileId,
-            title,
-            uploadedBy: currentUser.userName,
-            isRoomOnly: true
-        };
-        room.lastActivity = Date.now();
+        const { url, fileId, title, fileSize } = data;
+        const room = rooms.get(currentRoomCode);
         
-        io.to(currentRoomCode).emit('video-uploaded', {
-            videoUrl: url,
-            title,
-            uploadedBy: currentUser.userName
-        });
-        
-        console.log(`✅ Oda videosu yüklendi: ${title} - ${currentUser.userName}`);
-    }
-});
+        if (room) {
+            const videoId = 'room_' + Date.now();
+            roomVideos.set(videoId, {
+                id: videoId,
+                url,
+                fileId,
+                title,
+                uploadedBy: currentUser.userName,
+                uploadedAt: Date.now(),
+                expiresAt: Date.now() + (24 * 60 * 60 * 1000),
+                roomCode: currentRoomCode
+            });
+            
+            room.video = {
+                type: 'room',
+                url,
+                fileId,
+                title,
+                uploadedBy: currentUser.userName,
+                isRoomOnly: true
+            };
+            room.lastActivity = Date.now();
+            
+            io.to(currentRoomCode).emit('video-uploaded', {
+                videoUrl: url,
+                title,
+                uploadedBy: currentUser.userName
+            });
+            
+            console.log(`✅ Oda videosu yüklendi: ${title} - ${currentUser.userName}`);
+        }
+    });
 
     socket.on('play-library-film', (data) => {
         const { filmId, inRoom } = data;
@@ -901,21 +928,14 @@ app.get('/api/vapid-public-key', (req, res) => {
 
 app.post('/api/library/upload', upload.single('video'), async (req, res) => {
     try {
-        const clientIp = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
-        console.log('📤 Yükleme denemesi - IP:', clientIp);
-        console.log('📤 Beklenen Admin IP:', ADMIN_IP);
+        const { title, deviceId } = req.body;
+        const file = req.file;
         
-        // IP'leri temizle ve karşılaştır
-        const cleanClientIp = clientIp.replace('::ffff:', '').trim();
-        const cleanAdminIp = ADMIN_IP.replace('::ffff:', '').trim();
-        
-        if (cleanClientIp !== cleanAdminIp) {
-            console.log('❌ Yetkisiz erişim! IP eşleşmiyor');
+        // Admin kontrolü - deviceId'ye göre
+        if (deviceId !== ADMIN_DEVICE_ID) {
+            console.log('❌ Yetkisiz erişim! Device ID eşleşmiyor');
             return res.status(403).json({ error: 'Sadece admin yükleyebilir' });
         }
-        
-        const { title } = req.body;
-        const file = req.file;
         
         if (!file) {
             return res.status(400).json({ error: 'Video dosyası gerekli' });
@@ -936,7 +956,6 @@ app.post('/api/library/upload', upload.single('video'), async (req, res) => {
                 else resolve(result);
             });
         });
-        
         
         const videoId = 'lib_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5);
         const expiresAt = Date.now() + (7 * 24 * 60 * 60 * 1000);
@@ -1004,15 +1023,14 @@ app.get('/api/health', (req, res) => {
         messages: Array.from(messages.values()).reduce((acc, msgs) => acc + msgs.length, 0),
         stickers: Array.from(userStickers.values()).reduce((acc, s) => acc + s.length, 0),
         profiles: userProfiles.size,
-        subscriptions: pushSubscriptions.size,
-        adminIp: ADMIN_IP,
-        clientIp: req.headers['x-forwarded-for'] || req.socket.remoteAddress
+        subscriptions: pushSubscriptions.size
     });
 });
 
 app.get('/api/stats', (req, res) => {
-    const clientIp = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
-    if (clientIp !== ADMIN_IP) {
+    const { deviceId } = req.query;
+    
+    if (deviceId !== ADMIN_DEVICE_ID) {
         return res.status(403).json({ error: 'Yetkisiz erişim' });
     }
     
@@ -1049,8 +1067,9 @@ app.get('/api/stats', (req, res) => {
 
 app.delete('/api/library/:id', async (req, res) => {
     try {
-        const clientIp = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
-        if (clientIp !== ADMIN_IP) {
+        const { deviceId } = req.body;
+        
+        if (deviceId !== ADMIN_DEVICE_ID) {
             return res.status(403).json({ error: 'Sadece admin silebilir' });
         }
         
@@ -1095,7 +1114,7 @@ server.listen(PORT, '0.0.0.0', () => {
     console.log(`🚀 SERVER ${PORT} PORTUNDA ÇALIŞIYOR`);
     console.log('='.repeat(50));
     console.log(`📱 Birlikte İzle Platformu v5.0`);
-    console.log(`👑 Admin IP: ${ADMIN_IP}`);
+    console.log(`👑 Admin Device ID: ${ADMIN_DEVICE_ID}`);
     console.log(`📚 Video Kütüphanesi: ${videoLibrary.size} video`);
     console.log(`🔔 Bildirim Sistemi: Aktif`);
     console.log(`💾 ImageKit: 5GB Destekli`);
