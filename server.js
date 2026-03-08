@@ -141,11 +141,16 @@ function generateUserColor(username) {
     return colors[index % colors.length];
 }
 
+// server.js'deki generateDefaultAvatar fonksiyonunu DEĞİŞTİR:
 function generateDefaultAvatar(username) {
-    const firstLetter = username ? username.charAt(0).toUpperCase() : '?';
-    const colors = ['405DE6', '5851DB', '833AB4', 'C13584', 'E1306C', 'FD1D1D'];
-    const color = colors[Math.floor(Math.random() * colors.length)];
-    return `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 100 100"><circle cx="50" cy="50" r="50" fill="#${color}"/><text x="50" y="70" font-family="Arial" font-size="50" text-anchor="middle" fill="white">${firstLetter}</text></svg>`;
+    // Direkt PNG linki - Her zaman çalışır
+    return 'https://ik.imagekit.io/5v8xlfyfa/default-avatar.png';
+}
+
+// index.html'deki createDefaultAvatar fonksiyonunu DEĞİŞTİR:
+createDefaultAvatar(username) {
+    // Aynı PNG linki
+    return 'https://ik.imagekit.io/5v8xlfyfa/default-avatar.png';
 }
 
 function extractYouTubeId(url) {
@@ -618,42 +623,49 @@ io.on('connection', (socket) => {
         }
     });
 
-    socket.on('upload-room-video', (data) => {
-        if (!currentRoomCode || !currentUser || !currentUser.isOwner) return;
+// 📤 Video yükleme (oda içi - HERKES yükleyebilir, admin kontrolü KALDIR)
+socket.on('upload-room-video', (data) => {
+    // SADECE oda sahibi kontrolü, admin kontrolü YOK!
+    if (!currentRoomCode || !currentUser || !currentUser.isOwner) {
+        socket.emit('error', { message: 'Video yüklemek için oda sahibi olmalısınız!' });
+        return;
+    }
+    
+    const { url, fileId, title, fileSize } = data;
+    const room = rooms.get(currentRoomCode);
+    
+    if (room) {
+        const videoId = 'room_' + Date.now();
+        roomVideos.set(videoId, {
+            id: videoId,
+            url,
+            fileId,
+            title,
+            uploadedBy: currentUser.userName,
+            uploadedAt: Date.now(),
+            expiresAt: Date.now() + (24 * 60 * 60 * 1000),
+            roomCode: currentRoomCode
+        });
         
-        const { url, fileId, title, fileSize } = data;
-        const room = rooms.get(currentRoomCode);
+        room.video = {
+            type: 'room',
+            url,
+            fileId,
+            title,
+            uploadedBy: currentUser.userName,
+            isRoomOnly: true
+        };
+        room.lastActivity = Date.now();
         
-        if (room) {
-            const videoId = 'room_' + Date.now();
-            roomVideos.set(videoId, {
-                id: videoId,
-                url,
-                fileId,
-                title,
-                uploadedBy: currentUser.userName,
-                uploadedAt: Date.now(),
-                expiresAt: Date.now() + (24 * 60 * 60 * 1000),
-                roomCode: currentRoomCode
-            });
-            
-            room.video = {
-                type: 'room',
-                url,
-                fileId,
-                title,
-                uploadedBy: currentUser.userName,
-                isRoomOnly: true
-            };
-            room.lastActivity = Date.now();
-            
-            io.to(currentRoomCode).emit('video-uploaded', {
-                videoUrl: url,
-                title,
-                uploadedBy: currentUser.userName
-            });
-        }
-    });
+        io.to(currentRoomCode).emit('video-uploaded', {
+            videoUrl: url,
+            title,
+            uploadedBy: currentUser.userName
+        });
+        
+        console.log(`✅ Oda videosu yüklendi: ${title} - ${currentUser.userName}`);
+    }
+});
 
     socket.on('play-library-film', (data) => {
         const { filmId, inRoom } = data;
@@ -894,7 +906,15 @@ app.get('/api/vapid-public-key', (req, res) => {
 app.post('/api/library/upload', upload.single('video'), async (req, res) => {
     try {
         const clientIp = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
-        if (clientIp !== ADMIN_IP) {
+        console.log('📤 Yükleme denemesi - IP:', clientIp);
+        console.log('📤 Beklenen Admin IP:', ADMIN_IP);
+        
+        // IP'leri temizle ve karşılaştır
+        const cleanClientIp = clientIp.replace('::ffff:', '').trim();
+        const cleanAdminIp = ADMIN_IP.replace('::ffff:', '').trim();
+        
+        if (cleanClientIp !== cleanAdminIp) {
+            console.log('❌ Yetkisiz erişim! IP eşleşmiyor');
             return res.status(403).json({ error: 'Sadece admin yükleyebilir' });
         }
         
@@ -920,6 +940,36 @@ app.post('/api/library/upload', upload.single('video'), async (req, res) => {
                 else resolve(result);
             });
         });
+        
+        const videoId = 'lib_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5);
+        const expiresAt = Date.now() + (7 * 24 * 60 * 60 * 1000);
+        
+        videoLibrary.set(videoId, {
+            id: videoId,
+            title: title || file.originalname,
+            url: result.url,
+            fileId: result.fileId,
+            fileName: result.name,
+            thumbnail: result.thumbnail,
+            uploadedBy: 'Admin',
+            uploadedAt: Date.now(),
+            expiresAt: expiresAt,
+            size: result.size
+        });
+        
+        console.log(`✅ Kütüphaneye eklendi: ${title}`);
+        
+        res.json({ 
+            success: true, 
+            message: 'Video kütüphaneye eklendi',
+            library: getLibraryList()
+        });
+        
+    } catch (error) {
+        console.error('❌ Kütüphane yükleme hatası:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
         
         const videoId = 'lib_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5);
         const expiresAt = Date.now() + (7 * 24 * 60 * 60 * 1000);
