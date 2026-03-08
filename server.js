@@ -129,7 +129,7 @@ const upload = multer({
     }
 });
 
-// 🔧 Yardımcı fonksiyonlar
+// 🔧 Yardımcı fonksiyonlar - SADECE FONKSİYON TANIMLARI (io kullanmayanlar)
 function generateRoomCode() {
     const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
     let result = '';
@@ -173,6 +173,16 @@ function getLibraryList() {
     return list.sort((a, b) => b.uploadedAt - a.uploadedAt);
 }
 
+// 📡 Socket.io - ÖNCE io'YU TANIMLA
+const io = socketIo(server, {
+    cors: { origin: "*", methods: ["GET", "POST"] },
+    transports: ['websocket', 'polling'],
+    maxHttpBufferSize: 5 * 1024 * 1024 * 1024,
+    pingTimeout: 120000,
+    pingInterval: 25000
+});
+
+// ŞİMDİ io KULLANAN FONKSİYONLARI TANIMLA
 function updateUserList(roomCode) {
     const room = rooms.get(roomCode);
     if (!room) return;
@@ -207,15 +217,7 @@ function recordInteraction(deviceId1, deviceId2) {
     });
 }
 
-// 📡 Socket.io
-const io = socketIo(server, {
-    cors: { origin: "*", methods: ["GET", "POST"] },
-    transports: ['websocket', 'polling'],
-    maxHttpBufferSize: 5 * 1024 * 1024 * 1024,
-    pingTimeout: 120000,
-    pingInterval: 25000
-});
-
+// 📡 Socket.IO Bağlantıları
 io.on('connection', (socket) => {
     console.log('✅ Yeni bağlantı:', socket.id);
     
@@ -906,16 +908,8 @@ io.on('connection', (socket) => {
 });
 
 // 📡 API Routes
-
-// ImageKit auth
 app.get('/api/imagekit-auth', (req, res) => {
     try {
-        const imagekit = new ImageKit({
-            publicKey: process.env.IMAGEKIT_PUBLIC_KEY || 'public_mfwvdT7bS9kxwL5YpRv5YY9/W4Q=',
-            privateKey: process.env.IMAGEKIT_PRIVATE_KEY || 'private_jgXy2tt8CCzfQoR6bN3y/KfWjtE=',
-            urlEndpoint: process.env.IMAGEKIT_URL_ENDPOINT || 'https://ik.imagekit.io/5v8xlfyfa'
-        });
-        
         const authParams = imagekit.getAuthenticationParameters();
         res.json(authParams);
     } catch (error) {
@@ -923,12 +917,10 @@ app.get('/api/imagekit-auth', (req, res) => {
     }
 });
 
-// VAPID public key
 app.get('/api/vapid-public-key', (req, res) => {
     res.json({ publicKey: vapidKeys.publicKey });
 });
 
-// Kütüphaneye video yükle (admin only)
 app.post('/api/library/upload', upload.single('video'), async (req, res) => {
     try {
         const clientIp = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
@@ -960,7 +952,7 @@ app.post('/api/library/upload', upload.single('video'), async (req, res) => {
         });
         
         const videoId = 'lib_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5);
-        const expiresAt = Date.now() + (7 * 24 * 60 * 60 * 1000); // 7 gün
+        const expiresAt = Date.now() + (7 * 24 * 60 * 60 * 1000);
         
         videoLibrary.set(videoId, {
             id: videoId,
@@ -989,12 +981,10 @@ app.post('/api/library/upload', upload.single('video'), async (req, res) => {
     }
 });
 
-// Kütüphane listesi
 app.get('/api/library', (req, res) => {
     res.json(getLibraryList());
 });
 
-// Oda bilgisi
 app.get('/api/room/:code', (req, res) => {
     try {
         const room = rooms.get(req.params.code);
@@ -1016,7 +1006,6 @@ app.get('/api/room/:code', (req, res) => {
     }
 });
 
-// Health check
 app.get('/api/health', (req, res) => {
     res.json({ 
         status: 'OK', 
@@ -1034,7 +1023,6 @@ app.get('/api/health', (req, res) => {
     });
 });
 
-// İstatistikler (admin only)
 app.get('/api/stats', (req, res) => {
     const clientIp = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
     if (clientIp !== ADMIN_IP) {
@@ -1072,7 +1060,6 @@ app.get('/api/stats', (req, res) => {
     res.json(stats);
 });
 
-// Video sil (admin only)
 app.delete('/api/library/:id', async (req, res) => {
     try {
         const clientIp = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
@@ -1103,17 +1090,14 @@ app.delete('/api/library/:id', async (req, res) => {
     }
 });
 
-// Ana sayfa
 app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
-// Service worker
 app.get('/sw.js', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'sw.js'));
 });
 
-// Catch-all
 app.get('*', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
