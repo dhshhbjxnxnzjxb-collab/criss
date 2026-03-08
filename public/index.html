@@ -2508,7 +2508,9 @@
                 alert('❌ ' + message);
             }
 
-            showSuccess(message) {}
+            showSuccess(message) {
+                alert('✅ ' + message);
+            }
 
             setTheme(theme) {
                 this.currentTheme = theme;
@@ -2558,14 +2560,14 @@
                     reader.onload = (e) => {
                         this.userPhoto = e.target.result;
                         localStorage.setItem('userPhoto', this.userPhoto);
-                        document.getElementById('menuUserName').innerHTML = `<i class="bi bi-person-circle"></i> ${this.userName}`;
+                        document.getElementById('menuUserName').innerHTML = `<i class="bi bi-person-circle"></i> ${this.escapeHtml(this.userName)}`;
                         this.proceedWithAction();
                     };
                     reader.readAsDataURL(file);
                 } else {
                     this.userPhoto = this.createDefaultAvatar(userName);
                     localStorage.setItem('userPhoto', this.userPhoto);
-                    document.getElementById('menuUserName').innerHTML = `<i class="bi bi-person-circle"></i> ${this.userName}`;
+                    document.getElementById('menuUserName').innerHTML = `<i class="bi bi-person-circle"></i> ${this.escapeHtml(this.userName)}`;
                     this.proceedWithAction();
                 }
                 
@@ -2628,8 +2630,12 @@
                     this.isOwner = data.isOwner;
                     this.isAdmin = data.isAdmin;
                     
-                    this.menuUserName.innerHTML = `<i class="bi bi-person-circle"></i> ${this.userName}`;
+                    this.menuUserName.innerHTML = `<i class="bi bi-person-circle"></i> ${this.escapeHtml(this.userName)}`;
                     this.showChatInterface();
+                    
+                    if (this.isAdmin) {
+                        this.showSuccess('👑 Admin olarak giriş yaptın!');
+                    }
                 });
 
                 this.socket.on('room-joined', (data) => {
@@ -2638,8 +2644,12 @@
                     this.isOwner = data.isOwner;
                     this.isAdmin = data.isAdmin;
                     
-                    this.menuUserName.innerHTML = `<i class="bi bi-person-circle"></i> ${this.userName}`;
+                    this.menuUserName.innerHTML = `<i class="bi bi-person-circle"></i> ${this.escapeHtml(this.userName)}`;
                     this.showChatInterface();
+                    
+                    if (this.isAdmin) {
+                        this.showSuccess('👑 Admin olarak giriş yaptın!');
+                    }
                     
                     if (data.previousMessages) {
                         data.previousMessages.forEach(msg => this.displayMessage(msg));
@@ -2674,7 +2684,7 @@
                     this.isOwner = data.isOwner;
                     this.isAdmin = data.isAdmin;
                     
-                    this.menuUserName.innerHTML = `<i class="bi bi-person-circle"></i> ${this.userName}`;
+                    this.menuUserName.innerHTML = `<i class="bi bi-person-circle"></i> ${this.escapeHtml(this.userName)}`;
                     this.showChatInterface();
                     this.addSystemMessage('🔄 Oturum kurtarıldı, tekrar hoş geldin!');
                 });
@@ -2689,6 +2699,7 @@
 
                 this.socket.on('invite-sent', () => {
                     this.hideModal(this.inviteModal);
+                    this.showSuccess('✅ Davet gönderildi!');
                 });
 
                 this.socket.on('invite-error', (data) => {
@@ -2701,21 +2712,21 @@
                 });
 
                 this.socket.on('user-joined', (data) => {
-                    this.addSystemMessage(`👋 ${data.userName} katıldı`);
+                    this.addSystemMessage(`👋 ${this.escapeHtml(data.userName)} katıldı`);
                 });
 
                 this.socket.on('user-left', (data) => {
-                    this.addSystemMessage(`🚪 ${data.userName} ayrıldı`);
+                    this.addSystemMessage(`🚪 ${this.escapeHtml(data.userName)} ayrıldı`);
                 });
 
                 this.socket.on('video-uploaded', (data) => {
                     this.displayVideo(data.videoUrl);
-                    this.addSystemMessage(`🎬 "${data.title}" yüklendi`);
+                    this.addSystemMessage(`🎬 "${this.escapeHtml(data.title)}" yüklendi`);
                 });
 
                 this.socket.on('youtube-video-shared', (data) => {
                     this.displayYouTubeVideo(data.videoId, data.title);
-                    this.addSystemMessage(`🎬 "${data.title}" paylaşıldı`);
+                    this.addSystemMessage(`🎬 "${this.escapeHtml(data.title)}" paylaşıldı`);
                 });
 
                 this.socket.on('video-control', (data) => {
@@ -2757,6 +2768,10 @@
                     this.removeMessage(data.messageId);
                 });
 
+                this.socket.on('reaction-added', (data) => {
+                    this.updateMessageReaction(data.messageId, data.reaction, data.userId, data.userName);
+                });
+
                 this.socket.on('secure-photo-view', (data) => {
                     this.showSecurePhoto(data);
                 });
@@ -2769,7 +2784,7 @@
                     this.showPipVideo(data.url, data.title);
                 });
 
-                this.socket.on('emergency-message', () => {
+                this.socket.on('emergency-message', (data) => {
                     this.addSystemMessage(`🚨 Acil durum! Oda siliniyor...`);
                     setTimeout(() => window.location.reload(), 3000);
                 });
@@ -2945,6 +2960,7 @@
                 const formData = new FormData();
                 formData.append('video', file);
                 formData.append('title', title);
+                formData.append('deviceId', this.deviceId);
                 
                 this.showLoading('📚 Kütüphaneye yükleniyor...');
                 
@@ -2957,6 +2973,7 @@
                     const data = await res.json();
                     
                     if (data.success) {
+                        this.showSuccess('✅ Video kütüphaneye eklendi!');
                         this.loadLibraryFilms();
                     } else {
                         this.showError(data.error || 'Yükleme başarısız');
@@ -3070,73 +3087,69 @@
                 };
             }
 
-async uploadVideo(file) {
-    if (!file || !this.isOwner) {
-        this.showError('Video yüklemek için oda sahibi olmalısın!');
-        return;
-    }
-    
-    if (!file.type.startsWith('video/')) {
-        this.showError('Video dosyası seç!');
-        return;
-    }
-    
-    if (file.size > 5 * 1024 * 1024 * 1024) {
-        this.showError('Video 5GB\'dan küçük olmalı!');
-        return;
-    }
-    
-    this.showLoading('📤 Video yükleniyor... (Bu biraz sürebilir)');
-    
-    try {
-        // ImageKit auth al
-        const authRes = await fetch('/api/imagekit-auth');
-        const auth = await authRes.json();
-        
-        // ImageKit'i başlat
-        const imagekit = new ImageKit({
-            publicKey: 'public_mfwvdT7bS9kxwL5YpRv5YY9/W4Q=',
-            urlEndpoint: 'https://ik.imagekit.io/5v8xlfyfa',
-            authenticationEndpoint: '/api/imagekit-auth'
-        });
-        
-        // Direkt upload
-        imagekit.upload({
-            file: file,
-            fileName: file.name,
-            folder: '/room_videos',
-            tags: [this.roomCode, this.userName],
-            useUniqueFileName: true,
-            onProgress: (progress) => {
-                const percent = Math.round((progress.loaded / progress.total) * 100);
-                this.loadingText.textContent = `📤 Yükleniyor: %${percent}`;
+            async uploadVideo(file) {
+                if (!file || !this.isOwner) {
+                    this.showError('Video yüklemek için oda sahibi olmalısın!');
+                    return;
+                }
+                
+                if (!file.type.startsWith('video/')) {
+                    this.showError('Video dosyası seç!');
+                    return;
+                }
+                
+                if (file.size > 5 * 1024 * 1024 * 1024) {
+                    this.showError('Video 5GB\'dan küçük olmalı!');
+                    return;
+                }
+                
+                this.showLoading('📤 Video yükleniyor... (Bu biraz sürebilir)');
+                
+                try {
+                    const authRes = await fetch('/api/imagekit-auth');
+                    const auth = await authRes.json();
+                    
+                    const imagekit = new ImageKit({
+                        publicKey: 'public_mfwvdT7bS9kxwL5YpRv5YY9/W4Q=',
+                        urlEndpoint: 'https://ik.imagekit.io/5v8xlfyfa',
+                        authenticationEndpoint: '/api/imagekit-auth'
+                    });
+                    
+                    imagekit.upload({
+                        file: file,
+                        fileName: file.name,
+                        folder: '/room_videos',
+                        tags: [this.roomCode, this.userName],
+                        useUniqueFileName: true,
+                        onProgress: (progress) => {
+                            const percent = Math.round((progress.loaded / progress.total) * 100);
+                            this.loadingText.textContent = `📤 Yükleniyor: %${percent}`;
+                        }
+                    }, (err, result) => {
+                        if (err) {
+                            console.error('ImageKit hatası:', err);
+                            this.hideLoading();
+                            this.showError('Yükleme başarısız!');
+                            return;
+                        }
+                        
+                        this.socket.emit('upload-room-video', {
+                            url: result.url,
+                            fileId: result.fileId,
+                            title: file.name,
+                            fileSize: file.size
+                        });
+                        
+                        this.hideLoading();
+                        this.showSuccess('✅ Video yüklendi!');
+                    });
+                    
+                } catch (error) {
+                    console.error('Video yükleme hatası:', error);
+                    this.hideLoading();
+                    this.showError('Yükleme başarısız!');
+                }
             }
-        }, (err, result) => {
-            if (err) {
-                console.error('ImageKit hatası:', err);
-                this.hideLoading();
-                this.showError('Yükleme başarısız!');
-                return;
-            }
-            
-            // Oda içi video yükleme event'ini gönder
-            this.socket.emit('upload-room-video', {
-                url: result.url,
-                fileId: result.fileId,
-                title: file.name,
-                fileSize: file.size
-            });
-            
-            this.hideLoading();
-            this.showSuccess('✅ Video yüklendi!');
-        });
-        
-    } catch (error) {
-        console.error('Video yükleme hatası:', error);
-        this.hideLoading();
-        this.showError('Yükleme başarısız!');
-    }
-}
 
             displayVideo(url) {
                 this.noVideo.style.display = 'none';
@@ -3533,7 +3546,7 @@ async uploadVideo(file) {
                 replyItem.onclick = () => {
                     this.currentReplyTo = msg;
                     this.messageInput.focus();
-                    this.messageInput.placeholder = `${msg.userName}'e yanıt ver...`;
+                    this.messageInput.placeholder = `${this.escapeHtml(msg.userName)}'e yanıt ver...`;
                     reactionMenu.remove();
                     actionMenu.remove();
                 };
@@ -3567,6 +3580,34 @@ async uploadVideo(file) {
             addReaction(messageId, emoji) {
                 if (!this.socket) return;
                 this.socket.emit('add-reaction', { messageId, reaction: emoji });
+            }
+
+            updateMessageReaction(messageId, reaction, userId, userName) {
+                const messageElement = document.querySelector(`[data-message-id="${messageId}"]`);
+                if (!messageElement) return;
+                
+                const reactionsContainer = messageElement.querySelector('.message-reactions');
+                if (!reactionsContainer) {
+                    const content = messageElement.querySelector('.message-content');
+                    const newContainer = document.createElement('div');
+                    newContainer.className = 'message-reactions';
+                    newContainer.innerHTML = `<span class="reaction-badge">${reaction} 1</span>`;
+                    content.appendChild(newContainer);
+                } else {
+                    const existingReaction = Array.from(reactionsContainer.children).find(
+                        badge => badge.textContent.includes(reaction)
+                    );
+                    
+                    if (existingReaction) {
+                        const count = parseInt(existingReaction.textContent.split(' ')[1]) + 1;
+                        existingReaction.textContent = `${reaction} ${count}`;
+                    } else {
+                        const newBadge = document.createElement('span');
+                        newBadge.className = 'reaction-badge';
+                        newBadge.textContent = `${reaction} 1`;
+                        reactionsContainer.appendChild(newBadge);
+                    }
+                }
             }
 
             deleteMessage(messageId) {
@@ -3858,9 +3899,9 @@ async uploadVideo(file) {
             }
 
             createDefaultAvatar(username) {
-    // Direkt PNG linki - ImageKit'te bu resim olmalı
-    return 'https://ik.imagekit.io/5v8xlfyfa/default-avatar.png';
-}
+                const name = encodeURIComponent(username || 'Kullanici');
+                return `https://ui-avatars.com/api/?name=${name}&background=0095F6&color=fff&length=1&bold=true&size=128`;
+            }
 
             formatTime(seconds) {
                 if (seconds < 60) return `${seconds}s`;
@@ -3873,6 +3914,7 @@ async uploadVideo(file) {
             }
 
             escapeHtml(text) {
+                if (!text) return '';
                 const div = document.createElement('div');
                 div.textContent = text;
                 return div.innerHTML;
