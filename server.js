@@ -1127,7 +1127,7 @@ server.listen(PORT, '0.0.0.0', () => {
     console.log(`🚀 SERVER ${PORT} PORTUNDA ÇALIŞIYOR`);
     console.log('='.repeat(50));
     console.log(`📱 Birlikte İzle Platformu v5.0`);
-    console.log(`👑 Admin Device ID: ${ADMIN_DEVICE_ID}`);
+    console.log(`👑 Admin MAC Address: ${ADMIN_MAC_ADDRESS}`);
     console.log(`📚 Video Kütüphanesi: ${videoLibrary.size} video`);
     console.log(`🔔 Bildirim Sistemi: Aktif`);
     console.log(`💾 ImageKit: 5GB Destekli`);
