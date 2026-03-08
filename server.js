@@ -148,10 +148,6 @@ function generateDefaultAvatar(username) {
 }
 
 // index.html'deki createDefaultAvatar fonksiyonunu DEĞİŞTİR:
-createDefaultAvatar(username) {
-    // Aynı PNG linki
-    return 'https://ik.imagekit.io/5v8xlfyfa/default-avatar.png';
-}
 
 function extractYouTubeId(url) {
     const regex = /(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([^"&?\/\s]{11})/;
