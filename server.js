@@ -44,10 +44,13 @@ const deviceRelations = new Map();
 const pushSubscriptions = new Map();
 const userProfiles = new Map();
 const userSessions = new Map();
+const uploadChunks = new Map();
 
-// 👑 ADMIN ID - .env'den alınır
+// 👑 ADMIN MAC ADDRESS - .env'den alınır
 const ADMIN_MAC_ADDRESS = process.env.ADMIN_MAC_ADDRESS;
 
+// Global değişkenler
+let currentMacAddress = null;
 
 // 🔄 Self-ping
 setInterval(() => {
@@ -94,9 +97,26 @@ const cleanupJob = new CronJob('0 * * * *', () => {
             securePhotos.delete(code);
         }
     });
+    
+    // Eski chunk yüklemelerini temizle (60 dakikadan eski)
+    uploadChunks.forEach((upload, uploadId) => {
+        if (now - upload.createdAt > 60 * 60 * 1000) {
+            uploadChunks.delete(uploadId);
+        }
+    });
 });
 
 cleanupJob.start();
+
+// Her 30 dakikada bir chunk temizliği
+setInterval(() => {
+    const now = Date.now();
+    uploadChunks.forEach((upload, uploadId) => {
+        if (now - upload.createdAt > 60 * 60 * 1000) {
+            uploadChunks.delete(uploadId);
+        }
+    });
+}, 30 * 60 * 1000);
 
 // 🛠️ Middleware
 app.use(cors({
@@ -214,6 +234,7 @@ io.on('connection', (socket) => {
     let currentUser = null;
     let currentRoomCode = null;
     let currentDeviceId = null;
+    currentMacAddress = null;
 
     const pingInterval = setInterval(() => {
         if (socket.connected) {
@@ -223,35 +244,35 @@ io.on('connection', (socket) => {
 
     socket.on('pong', (data) => {});
 
-socket.on('register-device', (data) => {
-    const { deviceId, userName, userPhoto, macAddress } = data; // macAddress EKLENDİ
-    currentDeviceId = deviceId;
-    currentMacAddress = macAddress;
-    
-    // Admin kontrolü - MAC adresine göre
-    const isAdmin = (macAddress === ADMIN_MAC_ADDRESS);
-    if (isAdmin) console.log('👑 Admin girişi yapıldı!');
-    
-    if (!userProfiles.has(deviceId)) {
-        userProfiles.set(deviceId, {
-            deviceId,
-            userName,
-            userPhoto: userPhoto || generateDefaultAvatar(userName),
-            macAddress: macAddress, // MAC adresini de kaydet
-            firstSeen: Date.now(),
-            lastSeen: Date.now(),
-            interactions: new Set()
-        });
-    } else {
-        const profile = userProfiles.get(deviceId);
-        profile.lastSeen = Date.now();
-        profile.userName = userName;
-        if (userPhoto) profile.userPhoto = userPhoto;
-        if (macAddress) profile.macAddress = macAddress; // MAC güncelle
-    }
-    
-    socket.emit('device-registered', { success: true });
-});
+    socket.on('register-device', (data) => {
+        const { deviceId, userName, userPhoto, macAddress } = data;
+        currentDeviceId = deviceId;
+        currentMacAddress = macAddress;
+        
+        // Admin kontrolü - MAC adresine göre
+        const isAdmin = (macAddress === ADMIN_MAC_ADDRESS);
+        if (isAdmin) console.log('👑 Admin girişi yapıldı!');
+        
+        if (!userProfiles.has(deviceId)) {
+            userProfiles.set(deviceId, {
+                deviceId,
+                userName,
+                userPhoto: userPhoto || generateDefaultAvatar(userName),
+                macAddress: macAddress,
+                firstSeen: Date.now(),
+                lastSeen: Date.now(),
+                interactions: new Set()
+            });
+        } else {
+            const profile = userProfiles.get(deviceId);
+            profile.lastSeen = Date.now();
+            profile.userName = userName;
+            if (userPhoto) profile.userPhoto = userPhoto;
+            if (macAddress) profile.macAddress = macAddress;
+        }
+        
+        socket.emit('device-registered', { success: true });
+    });
 
     socket.on('subscribe-push', (data) => {
         const { deviceId, subscription } = data;
@@ -316,33 +337,30 @@ socket.on('register-device', (data) => {
         socket.emit('interactions-list', interactions);
     });
 
-socket.on('create-room', (data) => {
-    const { userName, userPhoto, deviceId, macAddress, roomName, password } = data; // macAddress EKLENDİ
-    
-    if (!userName || !roomName) {
-        socket.emit('error', { message: 'Kullanıcı adı ve oda adı gerekli' });
-        return;
-    }
-    
-    // Admin kontrolü - MAC adresine göre
-    const isAdmin = (macAddress === ADMIN_MAC_ADDRESS);
-    if (isAdmin) console.log('👑 Admin girişi yapıldı!');
-    
-    let roomCode = generateRoomCode();
-    while (rooms.has(roomCode)) roomCode = generateRoomCode();
-    
-    currentUser = {
-        id: socket.id,
-        deviceId: deviceId,
-        macAddress: macAddress, // MAC adresini kaydet
-        userName: userName,
-        userPhoto: userPhoto || generateDefaultAvatar(userName),
-        userColor: generateUserColor(userName),
-        isOwner: true,
-        isAdmin: isAdmin
-    };
-    
-    
+    socket.on('create-room', (data) => {
+        const { userName, userPhoto, deviceId, macAddress, roomName, password } = data;
+        
+        if (!userName || !roomName) {
+            socket.emit('error', { message: 'Kullanıcı adı ve oda adı gerekli' });
+            return;
+        }
+        
+        const isAdmin = (macAddress === ADMIN_MAC_ADDRESS);
+        if (isAdmin) console.log('👑 Admin girişi yapıldı!');
+        
+        let roomCode = generateRoomCode();
+        while (rooms.has(roomCode)) roomCode = generateRoomCode();
+        
+        currentUser = {
+            id: socket.id,
+            deviceId: deviceId,
+            macAddress: macAddress,
+            userName: userName,
+            userPhoto: userPhoto || generateDefaultAvatar(userName),
+            userColor: generateUserColor(userName),
+            isOwner: true,
+            isAdmin: isAdmin
+        };
         
         const room = {
             code: roomCode,
@@ -358,6 +376,7 @@ socket.on('create-room', (data) => {
                 currentTime: 0,
                 playbackRate: 1
             },
+            videoHistory: [],
             createdAt: Date.now(),
             lastActivity: Date.now()
         };
@@ -391,35 +410,33 @@ socket.on('create-room', (data) => {
         console.log(`✅ Oda oluşturuldu: ${roomCode} - Sahip: ${userName} - Admin: ${isAdmin}`);
     });
 
-socket.on('join-room', (data) => {
-    const { roomCode, userName, userPhoto, deviceId, macAddress, password } = data; // macAddress EKLENDİ
-    const room = rooms.get(roomCode.toUpperCase());
-    
-    if (!room) {
-        socket.emit('error', { message: 'Oda bulunamadı' });
-        return;
-    }
-    
-    if (room.password && room.password !== password) {
-        socket.emit('error', { message: 'Şifre yanlış' });
-        return;
-    }
-    
-    // Admin kontrolü - MAC adresine göre
-    const isAdmin = (macAddress === ADMIN_MAC_ADDRESS);
-    if (isAdmin) console.log('👑 Admin odaya katıldı!');
-    
-    currentUser = {
-        id: socket.id,
-        deviceId: deviceId,
-        macAddress: macAddress, // MAC adresini kaydet
-        userName: userName,
-        userPhoto: userPhoto || generateDefaultAvatar(userName),
-        userColor: generateUserColor(userName),
-        isOwner: false,
-        isAdmin: isAdmin
-    };
-    
+    socket.on('join-room', (data) => {
+        const { roomCode, userName, userPhoto, deviceId, macAddress, password } = data;
+        const room = rooms.get(roomCode.toUpperCase());
+        
+        if (!room) {
+            socket.emit('error', { message: 'Oda bulunamadı' });
+            return;
+        }
+        
+        if (room.password && room.password !== password) {
+            socket.emit('error', { message: 'Şifre yanlış' });
+            return;
+        }
+        
+        const isAdmin = (macAddress === ADMIN_MAC_ADDRESS);
+        if (isAdmin) console.log('👑 Admin odaya katıldı!');
+        
+        currentUser = {
+            id: socket.id,
+            deviceId: deviceId,
+            macAddress: macAddress,
+            userName: userName,
+            userPhoto: userPhoto || generateDefaultAvatar(userName),
+            userColor: generateUserColor(userName),
+            isOwner: false,
+            isAdmin: isAdmin
+        };
         
         room.users.set(socket.id, currentUser);
         users.set(socket.id, { ...currentUser, roomCode });
@@ -445,7 +462,8 @@ socket.on('join-room', (data) => {
             videoVisible: room.videoVisible,
             theme: room.theme,
             playbackState: room.playbackState,
-            stickers: roomStickers
+            stickers: roomStickers,
+            videoHistory: room.videoHistory || []
         });
         
         socket.emit('video-library-list', getLibraryList());
@@ -603,7 +621,6 @@ socket.on('join-room', (data) => {
                 roomMessages[messageIndex].reactions = [];
             }
             
-            // Aynı kullanıcının aynı emojiyi tekrar eklemesini engelle
             const existingReactionIndex = roomMessages[messageIndex].reactions.findIndex(
                 r => r.userId === currentUser.deviceId && r.emoji === reaction
             );
@@ -645,10 +662,11 @@ socket.on('join-room', (data) => {
                 const roomMessages = messages.get(currentRoomCode) || [];
                 const msgIndex = roomMessages.findIndex(m => m.secureId === secureId);
                 if (msgIndex !== -1) {
+                    const msgId = roomMessages[msgIndex].id;
                     roomMessages.splice(msgIndex, 1);
                     messages.set(currentRoomCode, roomMessages);
                     io.to(currentRoomCode).emit('message-deleted', { 
-                        messageId: roomMessages[msgIndex]?.id 
+                        messageId: msgId
                     });
                 }
                 
@@ -691,6 +709,17 @@ socket.on('join-room', (data) => {
                 uploadedBy: currentUser.userName,
                 isRoomOnly: true
             };
+            
+            if (!room.videoHistory) room.videoHistory = [];
+            room.videoHistory.unshift({
+                title,
+                url,
+                type: 'room',
+                uploadedBy: currentUser.userName,
+                uploadedAt: Date.now()
+            });
+            if (room.videoHistory.length > 20) room.videoHistory = room.videoHistory.slice(0, 20);
+            
             room.lastActivity = Date.now();
             
             io.to(currentRoomCode).emit('video-uploaded', {
@@ -723,6 +752,17 @@ socket.on('join-room', (data) => {
                     fromLibrary: true,
                     isCopyrightFree: true
                 };
+                
+                if (!room.videoHistory) room.videoHistory = [];
+                room.videoHistory.unshift({
+                    title: film.title,
+                    url: film.url,
+                    type: 'library',
+                    uploadedBy: film.uploadedBy,
+                    uploadedAt: Date.now()
+                });
+                if (room.videoHistory.length > 20) room.videoHistory = room.videoHistory.slice(0, 20);
+                
                 room.lastActivity = Date.now();
                 
                 io.to(currentRoomCode).emit('video-uploaded', {
@@ -760,11 +800,65 @@ socket.on('join-room', (data) => {
                 url: youtubeUrl,
                 title: title || 'YouTube Video'
             };
+            
+            if (!room.videoHistory) room.videoHistory = [];
+            room.videoHistory.unshift({
+                title: title || 'YouTube Video',
+                videoId,
+                type: 'youtube',
+                uploadedBy: currentUser.userName,
+                uploadedAt: Date.now()
+            });
+            if (room.videoHistory.length > 20) room.videoHistory = room.videoHistory.slice(0, 20);
+            
             room.lastActivity = Date.now();
             
             io.to(currentRoomCode).emit('youtube-video-shared', {
                 videoId,
                 title: title || 'YouTube Video'
+            });
+        }
+    });
+
+    socket.on('get-video-history', () => {
+        if (!currentRoomCode) return;
+        const room = rooms.get(currentRoomCode);
+        if (room) {
+            socket.emit('video-history', room.videoHistory || []);
+        }
+    });
+
+    socket.on('replay-video', (data) => {
+        if (!currentRoomCode || !currentUser || !currentUser.isOwner) return;
+        
+        const { video } = data;
+        const room = rooms.get(currentRoomCode);
+        
+        if (!room) return;
+        
+        if (video.type === 'youtube') {
+            room.video = {
+                type: 'youtube',
+                videoId: video.videoId,
+                url: `https://www.youtube.com/watch?v=${video.videoId}`,
+                title: video.title
+            };
+            io.to(currentRoomCode).emit('youtube-video-shared', {
+                videoId: video.videoId,
+                title: video.title
+            });
+        } else if (video.type === 'library' || video.type === 'room') {
+            room.video = {
+                type: video.type,
+                url: video.url,
+                title: video.title,
+                fromLibrary: video.type === 'library',
+                isCopyrightFree: video.type === 'library'
+            };
+            io.to(currentRoomCode).emit('video-uploaded', {
+                videoUrl: video.url,
+                title: video.title,
+                fromLibrary: video.type === 'library'
             });
         }
     });
@@ -939,12 +1033,118 @@ app.get('/api/vapid-public-key', (req, res) => {
     res.json({ publicKey: vapidKeys.publicKey });
 });
 
+app.post('/api/upload-chunk', express.json({ limit: '10mb' }), async (req, res) => {
+    try {
+        const { uploadId, chunkIndex, totalChunks, chunkData, fileName, mimeType, title, macAddress, type, roomCode } = req.body;
+        
+        if (!uploadId || chunkIndex === undefined || !totalChunks || !chunkData || !fileName || !type) {
+            return res.status(400).json({ error: 'Eksik parametreler' });
+        }
+        
+        let upload = uploadChunks.get(uploadId);
+        
+        if (!upload) {
+            upload = {
+                chunks: new Array(parseInt(totalChunks)),
+                totalChunks: parseInt(totalChunks),
+                fileName,
+                mimeType,
+                title: title || fileName,
+                macAddress,
+                type,
+                roomCode,
+                createdAt: Date.now()
+            };
+            uploadChunks.set(uploadId, upload);
+        }
+        
+        const chunkBuffer = Buffer.from(chunkData, 'base64');
+        upload.chunks[parseInt(chunkIndex)] = chunkBuffer;
+        
+        const receivedChunks = upload.chunks.filter(c => c !== undefined && c !== null).length;
+        
+        if (receivedChunks === upload.totalChunks) {
+            const fullBuffer = Buffer.concat(upload.chunks);
+            
+            let folder = type === 'library' ? '/library_videos' : '/room_videos';
+            
+            if (type === 'library' && macAddress !== ADMIN_MAC_ADDRESS) {
+                uploadChunks.delete(uploadId);
+                return res.status(403).json({ error: 'Sadece admin kütüphaneye yükleyebilir' });
+            }
+            
+            const result = await new Promise((resolve, reject) => {
+                imagekit.upload({
+                    file: fullBuffer,
+                    fileName: fileName,
+                    folder: folder,
+                    tags: type === 'library' ? ['library', 'copyright-free', 'admin'] : ['room_video'],
+                    useUniqueFileName: true,
+                    responseFields: ['fileId', 'name', 'url', 'thumbnail', 'size']
+                }, (error, result) => {
+                    if (error) reject(error);
+                    else resolve(result);
+                });
+            });
+            
+            if (type === 'library') {
+                const videoId = 'lib_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5);
+                const expiresAt = Date.now() + (7 * 24 * 60 * 60 * 1000);
+                
+                videoLibrary.set(videoId, {
+                    id: videoId,
+                    title: upload.title,
+                    url: result.url,
+                    fileId: result.fileId,
+                    fileName: result.name,
+                    thumbnail: result.thumbnail,
+                    uploadedBy: 'Admin',
+                    uploadedAt: Date.now(),
+                    expiresAt: expiresAt,
+                    size: result.size
+                });
+            } else if (type === 'room' && roomCode) {
+                const videoId = 'room_' + Date.now();
+                roomVideos.set(videoId, {
+                    id: videoId,
+                    url: result.url,
+                    fileId: result.fileId,
+                    title: upload.title,
+                    uploadedBy: 'Bekliyor',
+                    uploadedAt: Date.now(),
+                    expiresAt: Date.now() + (24 * 60 * 60 * 1000),
+                    roomCode: roomCode
+                });
+            }
+            
+            uploadChunks.delete(uploadId);
+            
+            res.json({
+                success: true,
+                done: true,
+                url: result.url,
+                fileId: result.fileId,
+                title: upload.title
+            });
+        } else {
+            res.json({
+                success: true,
+                done: false,
+                received: receivedChunks,
+                total: upload.totalChunks
+            });
+        }
+    } catch (error) {
+        console.error('❌ Chunk yükleme hatası:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
 app.post('/api/library/upload', upload.single('video'), async (req, res) => {
     try {
-        const { title, macAddress } = req.body; // deviceId yerine macAddress
+        const { title, macAddress } = req.body;
         const file = req.file;
         
-        // Admin kontrolü - MAC adresine göre
         if (macAddress !== ADMIN_MAC_ADDRESS) {
             console.log('❌ Yetkisiz erişim! MAC eşleşmiyor');
             return res.status(403).json({ error: 'Sadece admin yükleyebilir' });
@@ -1041,9 +1241,9 @@ app.get('/api/health', (req, res) => {
 });
 
 app.get('/api/stats', (req, res) => {
-    const { deviceId } = req.query;
+    const { macAddress } = req.query;
     
-    if (deviceId !== ADMIN_DEVICE_ID) {
+    if (macAddress !== ADMIN_MAC_ADDRESS) {
         return res.status(403).json({ error: 'Yetkisiz erişim' });
     }
     
@@ -1080,9 +1280,9 @@ app.get('/api/stats', (req, res) => {
 
 app.delete('/api/library/:id', async (req, res) => {
     try {
-        const { deviceId } = req.body;
+        const { macAddress } = req.body;
         
-        if (deviceId !== ADMIN_DEVICE_ID) {
+        if (macAddress !== ADMIN_MAC_ADDRESS) {
             return res.status(403).json({ error: 'Sadece admin silebilir' });
         }
         
@@ -1130,7 +1330,7 @@ server.listen(PORT, '0.0.0.0', () => {
     console.log(`👑 Admin MAC Address: ${ADMIN_MAC_ADDRESS}`);
     console.log(`📚 Video Kütüphanesi: ${videoLibrary.size} video`);
     console.log(`🔔 Bildirim Sistemi: Aktif`);
-    console.log(`💾 ImageKit: 5GB Destekli`);
+    console.log(`💾 ImageKit: 5GB Destekli (Chunk Upload ile)`);
     console.log(`🧹 Otomatik Temizlik: Her saat`);
     console.log('='.repeat(50));
 });
