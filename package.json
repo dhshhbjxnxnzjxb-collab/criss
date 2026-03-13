@@ -1,7 +1,7 @@
 {
   "name": "birlikte-izle-platformu",
   "version": "5.0.0",
-  "description": "Gelişmiş video izleme ve sohbet platformu - Device ID + Bildirim Sistemi + Video Kütüphanesi",
+  "description": "Gelişmiş video izleme ve sohbet platformu - Chunk Upload + Video Geçmişi + MAC Address Admin",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
