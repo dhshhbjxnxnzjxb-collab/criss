@@ -1,4 +1,4 @@
-// Service Worker v1.0 - Push Bildirimleri için
+// Service Worker v2.0 - Push Bildirimleri için
 
 self.addEventListener('install', (event) => {
     console.log('✅ Service Worker kuruldu');
