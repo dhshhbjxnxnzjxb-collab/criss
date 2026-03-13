@@ -3158,7 +3158,7 @@
                 this.uploadCancelled = false;
                 this.currentUploadId = 'upload_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
                 
-                const CHUNK_SIZE = 5 * 1024 * 1024; // 5MB
+                const CHUNK_SIZE = 1 * 1024 * 1024; // 1MB
                 const totalChunks = Math.ceil(file.size / CHUNK_SIZE);
                 
                 this.uploadProgress.style.display = 'block';
@@ -3342,7 +3342,7 @@
                 this.uploadCancelled = false;
                 this.currentUploadId = 'upload_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
                 
-                const CHUNK_SIZE = 5 * 1024 * 1024; // 5MB
+                const CHUNK_SIZE = 1 * 1024 * 1024; // 1MB
                 const totalChunks = Math.ceil(file.size / CHUNK_SIZE);
                 
                 this.uploadProgress.style.display = 'block';
