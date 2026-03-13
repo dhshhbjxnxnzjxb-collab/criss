@@ -15,7 +15,6 @@
     <!-- Socket.io ve YouTube API -->
     <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
     <script src="https://www.youtube.com/iframe_api"></script>
-    <script src="https://sdk.imagekit.io/5v8xlfyfa/imagekit.sdk.js"></script>
     
     <style>
         * { 
@@ -196,6 +195,15 @@
             color: white !important;
         }
         
+        body.light-theme .upload-progress {
+            background: #f0f0f0;
+            border-color: #dbdbdb;
+        }
+        
+        body.light-theme .progress-bar {
+            background: #0095F6;
+        }
+        
         @keyframes spin {
             0% { transform: rotate(0deg); }
             100% { transform: rotate(360deg); }
@@ -220,6 +228,11 @@
         @keyframes messageAppear {
             from { opacity: 0; transform: translateY(10px); }
             to { opacity: 1; transform: translateY(0); }
+        }
+        
+        @keyframes progressPulse {
+            0% { background-position: 0% 0%; }
+            100% { background-position: 200% 0%; }
         }
         
         .landing { 
@@ -947,6 +960,131 @@
             justify-content: center;
             font-size: 18px;
             border: 2px solid rgba(255,255,255,0.3);
+        }
+        
+        .upload-progress {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 80%;
+            max-width: 400px;
+            background: #1a1a1a;
+            border-radius: 30px;
+            padding: 25px;
+            border: 2px solid #333;
+            z-index: 2000;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.7);
+            text-align: center;
+        }
+        
+        .progress-bar-container {
+            width: 100%;
+            height: 20px;
+            background: #262626;
+            border-radius: 10px;
+            overflow: hidden;
+            margin: 15px 0;
+        }
+        
+        .progress-bar {
+            height: 100%;
+            background: linear-gradient(90deg, #0095F6, #00c6ff);
+            border-radius: 10px;
+            transition: width 0.3s ease;
+            width: 0%;
+        }
+        
+        .progress-text {
+            font-size: 16px;
+            margin-bottom: 10px;
+            color: #fff;
+        }
+        
+        .chunk-info {
+            font-size: 14px;
+            color: #8e8e8e;
+            margin-bottom: 15px;
+        }
+        
+        .cancel-upload {
+            background: #ff3b30;
+            color: white;
+            border: none;
+            border-radius: 30px;
+            padding: 12px 20px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .history-modal {
+            max-width: 95% !important;
+            width: 95% !important;
+        }
+        
+        .history-item {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            padding: 15px;
+            background: #262626;
+            border-radius: 16px;
+            margin-bottom: 12px;
+            border: 1px solid #333;
+        }
+        
+        body.light-theme .history-item {
+            background: #f0f0f0;
+        }
+        
+        .history-icon {
+            width: 50px;
+            height: 50px;
+            border-radius: 12px;
+            background: #1a1a1a;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 28px;
+            border: 2px solid #333;
+        }
+        
+        .history-info {
+            flex: 1;
+        }
+        
+        .history-title {
+            font-weight: 600;
+            margin-bottom: 5px;
+        }
+        
+        .history-meta {
+            font-size: 12px;
+            color: #8e8e8e;
+            display: flex;
+            gap: 10px;
+        }
+        
+        .replay-btn {
+            background: #0095F6;
+            color: white;
+            border: none;
+            border-radius: 30px;
+            padding: 8px 16px;
+            font-size: 14px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+        
+        .replay-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
         }
         
         .chat-interface { 
@@ -1980,6 +2118,18 @@
         </div>
     </div>
 
+    <div class="modal" id="videoHistoryModal">
+        <div class="modal-content history-modal">
+            <h2><i class="bi bi-clock-history"></i> Video Geçmişi</h2>
+            <div id="videoHistoryList" class="library-list" style="max-height: 60vh;"></div>
+            <div class="button-group">
+                <button class="btn btn-secondary" onclick="closeHistoryModal()">
+                    <i class="bi bi-x-lg"></i> Kapat
+                </button>
+            </div>
+        </div>
+    </div>
+
     <div class="modal" id="loadingModal">
         <div class="modal-content">
             <div style="text-align: center; padding: 40px;">
@@ -2002,6 +2152,17 @@
             <i class="bi bi-x-lg"></i>
         </button>
         <video id="pipVideoPlayer" controls></video>
+    </div>
+
+    <div class="upload-progress" id="uploadProgress" style="display: none;">
+        <div class="progress-text" id="uploadProgressText">Video yükleniyor...</div>
+        <div class="progress-bar-container">
+            <div class="progress-bar" id="uploadProgressBar"></div>
+        </div>
+        <div class="chunk-info" id="uploadChunkInfo">Parça 0/0</div>
+        <button class="cancel-upload" onclick="videoPlatform.cancelUpload()">
+            <i class="bi bi-x-lg"></i> İptal
+        </button>
     </div>
 
     <div class="menu-overlay" id="menuOverlay" onclick="closeMenu()"></div>
@@ -2105,6 +2266,9 @@
                     </button>
                     <button class="control-btn youtube-btn" onclick="showYouTubeSearch()" title="YouTube ara">
                         <i class="bi bi-youtube"></i>
+                    </button>
+                    <button class="control-btn" onclick="showVideoHistory()" title="Video geçmişi">
+                        <i class="bi bi-clock-history"></i>
                     </button>
                     <button class="control-btn delete-btn" onclick="videoPlatform.deleteVideo()" title="Videoyu kapat">
                         <i class="bi bi-trash-fill"></i>
@@ -2231,6 +2395,8 @@
                 this.mediaRecorder = null;
                 this.audioChunks = [];
                 this.longPressTimer = null;
+                this.uploadCancelled = false;
+                this.currentUploadId = null;
                 
                 this.initElements();
                 this.initEvents();
@@ -2256,15 +2422,14 @@
                 return deviceId;
             }
 
-// 📱 MAC Adresi alma fonksiyonu
-getMacAddress() {
-    let macAddress = localStorage.getItem('macAddress');
-    if (!macAddress) {
-        macAddress = '9c:28:f7:8d:c1:ed'; // Senin MAC adresin
-        localStorage.setItem('macAddress', macAddress);
-    }
-    return macAddress;
-}
+            getMacAddress() {
+                let macAddress = localStorage.getItem('macAddress');
+                if (!macAddress) {
+                    macAddress = '9c:28:f7:8d:c1:ed';
+                    localStorage.setItem('macAddress', macAddress);
+                }
+                return macAddress;
+            }
 
             preventScreenshots() {
                 document.addEventListener('keyup', (e) => {
@@ -2349,6 +2514,9 @@ getMacAddress() {
                 this.youtubeSearchInput = document.getElementById('youtubeSearchInput');
                 this.youtubeSearchResults = document.getElementById('youtubeSearchResults');
                 
+                this.videoHistoryModal = document.getElementById('videoHistoryModal');
+                this.videoHistoryList = document.getElementById('videoHistoryList');
+                
                 this.loadingModal = document.getElementById('loadingModal');
                 this.loadingText = document.getElementById('loadingText');
                 
@@ -2358,6 +2526,11 @@ getMacAddress() {
                 
                 this.pipVideo = document.getElementById('pipVideo');
                 this.pipVideoPlayer = document.getElementById('pipVideoPlayer');
+                
+                this.uploadProgress = document.getElementById('uploadProgress');
+                this.uploadProgressText = document.getElementById('uploadProgressText');
+                this.uploadProgressBar = document.getElementById('uploadProgressBar');
+                this.uploadChunkInfo = document.getElementById('uploadChunkInfo');
                 
                 this.hamburgerMenu = document.getElementById('hamburgerMenu');
                 this.menuOverlay = document.getElementById('menuOverlay');
@@ -2461,7 +2634,7 @@ getMacAddress() {
                 
                 this.uploadToLibraryBtn.addEventListener('click', () => this.libraryVideoInput.click());
                 this.libraryVideoInput.addEventListener('change', (e) => {
-                    if (e.target.files[0]) this.handleLibraryUpload(e.target.files[0]);
+                    if (e.target.files[0]) this.uploadLibraryVideo(e.target.files[0]);
                 });
                 
                 this.inviteMenuItem.addEventListener('click', () => this.showInviteModal());
@@ -2616,12 +2789,12 @@ getMacAddress() {
                 this.socket.on('connect', () => {
                     this.hideLoading();
                     
-     this.socket.emit('register-device', {
-    deviceId: this.deviceId,
-    macAddress: this.getMacAddress(), // YENİ SATIR
-    userName: this.userName,
-    userPhoto: this.userPhoto
-});
+                    this.socket.emit('register-device', {
+                        deviceId: this.deviceId,
+                        macAddress: this.getMacAddress(),
+                        userName: this.userName,
+                        userPhoto: this.userPhoto
+                    });
                     
                     setTimeout(() => {
                         this.socket.emit('recover-session', { userId: this.userId });
@@ -2801,6 +2974,10 @@ getMacAddress() {
                     setTimeout(() => window.location.reload(), 3000);
                 });
 
+                this.socket.on('video-history', (history) => {
+                    this.displayVideoHistory(history);
+                });
+
                 this.socket.on('error', (data) => {
                     this.hideLoading();
                     this.showError(data.message);
@@ -2834,19 +3011,19 @@ getMacAddress() {
                 this.connectSocket();
             }
 
-finalizeCreateRoom() {
-    if (this.pendingRoomData) {
-        this.socket.emit('create-room', {
-            userName: this.userName,
-            userPhoto: this.userPhoto,
-            deviceId: this.deviceId,
-            macAddress: this.getMacAddress(), // YENİ SATIR
-            roomName: this.pendingRoomData.roomName,
-            password: this.pendingRoomData.password || null
-        });
-        this.pendingRoomData = null;
-    }
-}
+            finalizeCreateRoom() {
+                if (this.pendingRoomData) {
+                    this.socket.emit('create-room', {
+                        userName: this.userName,
+                        userPhoto: this.userPhoto,
+                        deviceId: this.deviceId,
+                        macAddress: this.getMacAddress(),
+                        roomName: this.pendingRoomData.roomName,
+                        password: this.pendingRoomData.password || null
+                    });
+                    this.pendingRoomData = null;
+                }
+            }
 
             joinRoom() {
                 const roomCode = this.roomCodeInput.value.trim().toUpperCase();
@@ -2866,19 +3043,19 @@ finalizeCreateRoom() {
                 this.connectSocket();
             }
 
-finalizeJoinRoom() {
-    if (this.pendingRoomData) {
-        this.socket.emit('join-room', {
-            roomCode: this.pendingRoomData.roomCode,
-            userName: this.userName,
-            userPhoto: this.userPhoto,
-            deviceId: this.deviceId,
-            macAddress: this.getMacAddress(), // YENİ SATIR
-            password: this.pendingRoomData.password || null
-        });
-        this.pendingRoomData = null;
-    }
-}
+            finalizeJoinRoom() {
+                if (this.pendingRoomData) {
+                    this.socket.emit('join-room', {
+                        roomCode: this.pendingRoomData.roomCode,
+                        userName: this.userName,
+                        userPhoto: this.userPhoto,
+                        deviceId: this.deviceId,
+                        macAddress: this.getMacAddress(),
+                        password: this.pendingRoomData.password || null
+                    });
+                    this.pendingRoomData = null;
+                }
+            }
 
             showChatInterface() {
                 this.landingPage.style.display = 'none';
@@ -2917,11 +3094,13 @@ finalizeJoinRoom() {
                     } else {
                         films.forEach(film => {
                             const date = new Date(film.uploadedAt).toLocaleDateString('tr-TR');
+                            const daysLeft = Math.floor(film.timeRemaining / 86400);
+                            const hoursLeft = Math.floor((film.timeRemaining % 86400) / 3600);
+                            const timeText = daysLeft > 0 ? `${daysLeft} gün` : `${hoursLeft} saat`;
+                            
                             html += `
                                 <div class="library-item" onclick="videoPlatform.playLibraryFilm('${film.id}')">
-                                    <div class="library-thumb">
-                                        <i class="bi bi-film"></i>
-                                    </div>
+                                    <img src="${film.thumbnail || 'https://via.placeholder.com/100x70?text=Video'}" class="library-thumb" onerror="this.src='https://via.placeholder.com/100x70?text=Video'">
                                     <div class="library-info">
                                         <div class="library-title">${this.escapeHtml(film.title)}</div>
                                         <div class="library-meta">
@@ -2929,7 +3108,7 @@ finalizeJoinRoom() {
                                             <i class="bi bi-calendar-fill"></i> ${date}
                                         </div>
                                         <div class="library-expiry">
-                                            <i class="bi bi-hourglass-split"></i> ${this.formatTime(film.timeRemaining)} kaldı
+                                            <i class="bi bi-hourglass-split"></i> ${timeText} kaldı
                                         </div>
                                     </div>
                                 </div>
@@ -2960,44 +3139,87 @@ finalizeJoinRoom() {
                 this.videoLibraryModal.classList.remove('active');
             }
 
-async handleLibraryUpload(file) {
-    if (!file) return;
-    
-    if (!file.type.startsWith('video/')) {
-        this.showError('Video dosyası seç!');
-        return;
-    }
-    
-    const title = prompt('Film başlığını girin:', file.name.replace(/\.[^/.]+$/, ""));
-    if (!title) return;
-    
-    const formData = new FormData();
-    formData.append('video', file);
-    formData.append('title', title);
-    formData.append('macAddress', this.getMacAddress()); // deviceId YERİNE macAddress
-    
-    this.showLoading('📚 Kütüphaneye yükleniyor...');
-    
-    try {
-        const res = await fetch('/api/library/upload', {
-            method: 'POST',
-            body: formData
-        });
-        
-        const data = await res.json();
-        
-        if (data.success) {
-            this.showSuccess('✅ Video kütüphaneye eklendi!');
-            this.loadLibraryFilms();
-        } else {
-            this.showError(data.error || 'Yükleme başarısız');
-        }
-    } catch (error) {
-        this.showError('Yükleme hatası!');
-    }
-    
-    this.hideLoading();
-}
+            async uploadLibraryVideo(file) {
+                if (!file) return;
+                
+                if (!file.type.startsWith('video/')) {
+                    this.showError('Video dosyası seç!');
+                    return;
+                }
+                
+                if (file.size > 5 * 1024 * 1024 * 1024) {
+                    this.showError('Video 5GB\'dan küçük olmalı!');
+                    return;
+                }
+                
+                const title = prompt('Film başlığını girin:', file.name.replace(/\.[^/.]+$/, ""));
+                if (!title) return;
+                
+                this.uploadCancelled = false;
+                this.currentUploadId = 'upload_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+                
+                const CHUNK_SIZE = 5 * 1024 * 1024; // 5MB
+                const totalChunks = Math.ceil(file.size / CHUNK_SIZE);
+                
+                this.uploadProgress.style.display = 'block';
+                this.uploadProgressText.textContent = 'Kütüphaneye yükleniyor...';
+                this.uploadProgressBar.style.width = '0%';
+                this.uploadChunkInfo.textContent = `Parça 0/${totalChunks}`;
+                
+                try {
+                    for (let i = 0; i < totalChunks; i++) {
+                        if (this.uploadCancelled) {
+                            this.uploadProgress.style.display = 'none';
+                            this.showError('Yükleme iptal edildi');
+                            return;
+                        }
+                        
+                        const start = i * CHUNK_SIZE;
+                        const end = Math.min(start + CHUNK_SIZE, file.size);
+                        const chunk = file.slice(start, end);
+                        
+                        const chunkData = await new Promise((resolve) => {
+                            const reader = new FileReader();
+                            reader.onload = (e) => resolve(e.target.result.split(',')[1]);
+                            reader.readAsDataURL(chunk);
+                        });
+                        
+                        const response = await fetch('/api/upload-chunk', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                uploadId: this.currentUploadId,
+                                chunkIndex: i,
+                                totalChunks: totalChunks,
+                                chunkData: chunkData,
+                                fileName: file.name,
+                                mimeType: file.type,
+                                title: title,
+                                macAddress: this.getMacAddress(),
+                                type: 'library'
+                            })
+                        });
+                        
+                        const result = await response.json();
+                        
+                        if (!result.success) {
+                            throw new Error(result.error || 'Yükleme hatası');
+                        }
+                        
+                        const percent = Math.round(((i + 1) / totalChunks) * 100);
+                        this.uploadProgressBar.style.width = percent + '%';
+                        this.uploadChunkInfo.textContent = `Parça ${i + 1}/${totalChunks}`;
+                    }
+                    
+                    this.uploadProgress.style.display = 'none';
+                    this.showSuccess('✅ Video kütüphaneye eklendi!');
+                    this.loadLibraryFilms();
+                    
+                } catch (error) {
+                    this.uploadProgress.style.display = 'none';
+                    this.showError('Yükleme hatası: ' + error.message);
+                }
+            }
 
             updateLibraryList(videos) {}
 
@@ -3117,52 +3339,83 @@ async handleLibraryUpload(file) {
                     return;
                 }
                 
-                this.showLoading('📤 Video yükleniyor... (Bu biraz sürebilir)');
+                this.uploadCancelled = false;
+                this.currentUploadId = 'upload_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+                
+                const CHUNK_SIZE = 5 * 1024 * 1024; // 5MB
+                const totalChunks = Math.ceil(file.size / CHUNK_SIZE);
+                
+                this.uploadProgress.style.display = 'block';
+                this.uploadProgressText.textContent = 'Video yükleniyor...';
+                this.uploadProgressBar.style.width = '0%';
+                this.uploadChunkInfo.textContent = `Parça 0/${totalChunks}`;
                 
                 try {
-                    const authRes = await fetch('/api/imagekit-auth');
-                    const auth = await authRes.json();
-                    
-                    const imagekit = new ImageKit({
-                        publicKey: 'public_mfwvdT7bS9kxwL5YpRv5YY9/W4Q=',
-                        urlEndpoint: 'https://ik.imagekit.io/5v8xlfyfa',
-                        authenticationEndpoint: '/api/imagekit-auth'
-                    });
-                    
-                    imagekit.upload({
-                        file: file,
-                        fileName: file.name,
-                        folder: '/room_videos',
-                        tags: [this.roomCode, this.userName],
-                        useUniqueFileName: true,
-                        onProgress: (progress) => {
-                            const percent = Math.round((progress.loaded / progress.total) * 100);
-                            this.loadingText.textContent = `📤 Yükleniyor: %${percent}`;
-                        }
-                    }, (err, result) => {
-                        if (err) {
-                            console.error('ImageKit hatası:', err);
-                            this.hideLoading();
-                            this.showError('Yükleme başarısız!');
+                    for (let i = 0; i < totalChunks; i++) {
+                        if (this.uploadCancelled) {
+                            this.uploadProgress.style.display = 'none';
+                            this.showError('Yükleme iptal edildi');
                             return;
                         }
                         
-                        this.socket.emit('upload-room-video', {
-                            url: result.url,
-                            fileId: result.fileId,
-                            title: file.name,
-                            fileSize: file.size
+                        const start = i * CHUNK_SIZE;
+                        const end = Math.min(start + CHUNK_SIZE, file.size);
+                        const chunk = file.slice(start, end);
+                        
+                        const chunkData = await new Promise((resolve) => {
+                            const reader = new FileReader();
+                            reader.onload = (e) => resolve(e.target.result.split(',')[1]);
+                            reader.readAsDataURL(chunk);
                         });
                         
-                        this.hideLoading();
-                        this.showSuccess('✅ Video yüklendi!');
-                    });
+                        const response = await fetch('/api/upload-chunk', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                uploadId: this.currentUploadId,
+                                chunkIndex: i,
+                                totalChunks: totalChunks,
+                                chunkData: chunkData,
+                                fileName: file.name,
+                                mimeType: file.type,
+                                title: file.name,
+                                macAddress: this.getMacAddress(),
+                                type: 'room',
+                                roomCode: this.roomCode
+                            })
+                        });
+                        
+                        const result = await response.json();
+                        
+                        if (!result.success) {
+                            throw new Error(result.error || 'Yükleme hatası');
+                        }
+                        
+                        const percent = Math.round(((i + 1) / totalChunks) * 100);
+                        this.uploadProgressBar.style.width = percent + '%';
+                        this.uploadChunkInfo.textContent = `Parça ${i + 1}/${totalChunks}`;
+                        
+                        if (result.done) {
+                            this.socket.emit('upload-room-video', {
+                                url: result.url,
+                                fileId: result.fileId,
+                                title: file.name,
+                                fileSize: file.size
+                            });
+                        }
+                    }
+                    
+                    this.uploadProgress.style.display = 'none';
                     
                 } catch (error) {
-                    console.error('Video yükleme hatası:', error);
-                    this.hideLoading();
-                    this.showError('Yükleme başarısız!');
+                    this.uploadProgress.style.display = 'none';
+                    this.showError('Yükleme hatası: ' + error.message);
                 }
+            }
+
+            cancelUpload() {
+                this.uploadCancelled = true;
+                this.uploadProgress.style.display = 'none';
             }
 
             displayVideo(url) {
@@ -3879,6 +4132,54 @@ async handleLibraryUpload(file) {
                 this.pipVideoPlayer.src = '';
             }
 
+            showVideoHistory() {
+                if (!this.socket) return;
+                this.socket.emit('get-video-history');
+                this.videoHistoryModal.classList.add('active');
+            }
+
+            displayVideoHistory(history) {
+                let html = '';
+                
+                if (!history || history.length === 0) {
+                    html = '<div style="text-align: center; padding: 40px; color: #8e8e8e;"><i class="bi bi-clock-history" style="font-size: 48px; display: block; margin-bottom: 15px;"></i>Henüz video geçmişi yok</div>';
+                } else {
+                    history.forEach(video => {
+                        const date = new Date(video.uploadedAt).toLocaleString('tr-TR');
+                        let icon = '';
+                        if (video.type === 'youtube') icon = '<i class="bi bi-youtube" style="color: #FF0000;"></i>';
+                        else if (video.type === 'library') icon = '<i class="bi bi-film" style="color: #833AB4;"></i>';
+                        else icon = '<i class="bi bi-camera-reels-fill" style="color: #0095F6;"></i>';
+                        
+                        html += `
+                            <div class="history-item">
+                                <div class="history-icon">${icon}</div>
+                                <div class="history-info">
+                                    <div class="history-title">${this.escapeHtml(video.title)}</div>
+                                    <div class="history-meta">
+                                        <span><i class="bi bi-person-fill"></i> ${video.uploadedBy}</span>
+                                        <span><i class="bi bi-clock-fill"></i> ${date}</span>
+                                    </div>
+                                </div>
+                                ${this.isOwner ? `
+                                    <button class="replay-btn" onclick="videoPlatform.replayVideo(${JSON.stringify(video).replace(/"/g, '&quot;')})">
+                                        <i class="bi bi-play-fill"></i> Tekrar Oynat
+                                    </button>
+                                ` : ''}
+                            </div>
+                        `;
+                    });
+                }
+                
+                this.videoHistoryList.innerHTML = html;
+            }
+
+            replayVideo(video) {
+                if (!this.socket || !this.isOwner) return;
+                this.socket.emit('replay-video', { video });
+                this.videoHistoryModal.classList.remove('active');
+            }
+
             addSystemMessage(text) {
                 const msg = document.createElement('div');
                 msg.className = 'system-message';
@@ -3970,6 +4271,10 @@ async handleLibraryUpload(file) {
 
         function closeInviteModal() {
             document.getElementById('inviteModal').classList.remove('active');
+        }
+
+        function closeHistoryModal() {
+            document.getElementById('videoHistoryModal').classList.remove('active');
         }
 
         function closeCreatePanel() {
