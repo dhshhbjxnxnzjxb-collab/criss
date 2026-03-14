@@ -1,7 +1,7 @@
 {
   "name": "birlikte-izle-platformu",
   "version": "5.0.0",
-  "description": "Gelişmiş video izleme ve sohbet platformu - Chunk Upload + Video Geçmişi + MAC Address Admin",
+  "description": "Gelişmiş video izleme ve sohbet platformu - Disk tabanlı chunk upload + Video geçmişi + MAC Address admin",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
