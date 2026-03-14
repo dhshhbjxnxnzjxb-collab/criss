@@ -7,6 +7,8 @@ const multer = require('multer');
 const ImageKit = require('imagekit');
 const CronJob = require('cron').CronJob;
 const webpush = require('web-push');
+const fs = require('fs');
+const os = require('os');
 require('dotenv').config();
 
 const app = express();
@@ -44,13 +46,20 @@ const deviceRelations = new Map();
 const pushSubscriptions = new Map();
 const userProfiles = new Map();
 const userSessions = new Map();
-const uploadChunks = new Map();
+const uploadSessions = new Map();
 
 // 👑 ADMIN MAC ADDRESS - .env'den alınır
 const ADMIN_MAC_ADDRESS = process.env.ADMIN_MAC_ADDRESS;
 
 // Global değişkenler
 let currentMacAddress = null;
+
+// 📁 Geçici klasör oluştur
+const TEMP_UPLOAD_DIR = path.join(os.tmpdir(), 'birlikte-izle-uploads');
+if (!fs.existsSync(TEMP_UPLOAD_DIR)) {
+    fs.mkdirSync(TEMP_UPLOAD_DIR, { recursive: true });
+    console.log(`📁 Geçici klasör oluşturuldu: ${TEMP_UPLOAD_DIR}`);
+}
 
 // 🔄 Self-ping
 setInterval(() => {
@@ -97,23 +106,32 @@ const cleanupJob = new CronJob('0 * * * *', () => {
             securePhotos.delete(code);
         }
     });
-    
-    // Eski chunk yüklemelerini temizle (60 dakikadan eski)
-    uploadChunks.forEach((upload, uploadId) => {
-        if (now - upload.createdAt > 60 * 60 * 1000) {
-            uploadChunks.delete(uploadId);
-        }
-    });
 });
 
 cleanupJob.start();
 
-// Her 30 dakikada bir chunk temizliği
+// Geçici dosya temizliği
 setInterval(() => {
     const now = Date.now();
-    uploadChunks.forEach((upload, uploadId) => {
-        if (now - upload.createdAt > 60 * 60 * 1000) {
-            uploadChunks.delete(uploadId);
+    const files = fs.readdirSync(TEMP_UPLOAD_DIR);
+    
+    files.forEach(file => {
+        const filePath = path.join(TEMP_UPLOAD_DIR, file);
+        try {
+            const stats = fs.statSync(filePath);
+            if (now - stats.mtimeMs > 60 * 60 * 1000) {
+                fs.unlinkSync(filePath);
+                console.log(`🗑️ Eski geçici dosya silindi: ${file}`);
+            }
+        } catch (e) {}
+    });
+    
+    uploadSessions.forEach((session, uploadId) => {
+        if (now - session.createdAt > 60 * 60 * 1000) {
+            if (session.tempFilePath && fs.existsSync(session.tempFilePath)) {
+                try { fs.unlinkSync(session.tempFilePath); } catch (e) {}
+            }
+            uploadSessions.delete(uploadId);
         }
     });
 }, 30 * 60 * 1000);
@@ -189,7 +207,7 @@ function getLibraryList() {
 const io = socketIo(server, {
     cors: { origin: "*", methods: ["GET", "POST"] },
     transports: ['websocket', 'polling'],
-    maxHttpBufferSize: 5 * 1024 * 1024 * 1024,
+    maxHttpBufferSize: 10 * 1024 * 1024,
     pingTimeout: 120000,
     pingInterval: 25000
 });
@@ -249,7 +267,6 @@ io.on('connection', (socket) => {
         currentDeviceId = deviceId;
         currentMacAddress = macAddress;
         
-        // Admin kontrolü - MAC adresine göre
         const isAdmin = (macAddress === ADMIN_MAC_ADDRESS);
         if (isAdmin) console.log('👑 Admin girişi yapıldı!');
         
@@ -276,10 +293,29 @@ io.on('connection', (socket) => {
 
     socket.on('subscribe-push', (data) => {
         const { deviceId, subscription } = data;
+        
+        if (!subscription || !subscription.endpoint) {
+            console.log('❌ Geçersiz push aboneliği');
+            return;
+        }
+        
         pushSubscriptions.set(deviceId, {
             subscription,
-            expiresAt: Date.now() + (30 * 24 * 60 * 60 * 1000)
+            expiresAt: Date.now() + (30 * 24 * 60 * 60 * 1000),
+            createdAt: Date.now()
         });
+        
+        console.log(`✅ Push aboneliği kaydedildi: ${deviceId}`);
+        
+        setTimeout(() => {
+            try {
+                webpush.sendNotification(subscription, JSON.stringify({
+                    title: '🔔 Bildirimler Aktif',
+                    body: 'Artık davet bildirimleri alacaksın!',
+                    icon: 'https://ik.imagekit.io/5v8xlfyfa/icon.png'
+                })).catch(e => console.log('Test bildirimi hatası:', e.message));
+            } catch (e) {}
+        }, 1000);
     });
 
     socket.on('send-invite', async (data) => {
@@ -287,26 +323,44 @@ io.on('connection', (socket) => {
         
         const subscription = pushSubscriptions.get(toDeviceId);
         if (!subscription) {
-            socket.emit('invite-error', { message: 'Kullanıcı bildirimlere açık değil' });
+            console.log(`❌ Bildirim gönderilemedi: ${toDeviceId} aboneliği yok`);
+            socket.emit('invite-error', { message: 'Kullanıcı çevrimdışı veya bildirimlere kapalı' });
             return;
         }
         
-        const payload = JSON.stringify({
-            title: '📱 Birlikte İzle Daveti',
-            body: `${fromUserName} seni "${roomName}" odasına davet ediyor!`,
-            icon: 'https://ik.imagekit.io/5v8xlfyfa/icon.png',
-            data: {
-                url: `/?room=${roomCode}`,
-                roomCode: roomCode
-            }
-        });
-        
         try {
+            const payload = JSON.stringify({
+                title: '📱 Birlikte İzle Daveti',
+                body: `${fromUserName} seni "${roomName}" odasına davet ediyor!`,
+                icon: 'https://ik.imagekit.io/5v8xlfyfa/icon.png',
+                badge: 'https://ik.imagekit.io/5v8xlfyfa/badge.png',
+                vibrate: [200, 100, 200],
+                data: {
+                    url: `/?room=${roomCode}`,
+                    roomCode: roomCode
+                },
+                actions: [
+                    { action: 'open', title: '🚪 Odaya Git' },
+                    { action: 'close', title: '❌ Kapat' }
+                ]
+            });
+            
             await webpush.sendNotification(subscription.subscription, payload);
+            console.log(`✅ Bildirim gönderildi: ${toDeviceId}`);
             socket.emit('invite-sent', { success: true });
         } catch (error) {
-            console.error('❌ Bildirim gönderilemedi:', error);
-            pushSubscriptions.delete(toDeviceId);
+            console.error('❌ Bildirim gönderilemedi:', error.statusCode, error.body);
+            
+            if (error.statusCode === 410 || error.statusCode === 404) {
+                console.log(`🗑️ Geçersiz abonelik silindi: ${toDeviceId}`);
+                pushSubscriptions.delete(toDeviceId);
+            }
+            
+            socket.emit('invite-error', { 
+                message: error.statusCode === 410 || error.statusCode === 404 
+                    ? 'Kullanıcı bildirimleri kapatmış' 
+                    : 'Bildirim gönderilemedi'
+            });
         }
     });
 
@@ -530,7 +584,12 @@ io.on('connection', (socket) => {
             replyTo: messageData.replyTo || null,
             isSecure: messageData.isSecure || false,
             secureId: messageData.secureId || null,
-            time: new Date().toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' }),
+            time: new Date().toLocaleTimeString('tr-TR', { 
+                hour: '2-digit', 
+                minute: '2-digit',
+                hour12: false,
+                timeZone: 'Europe/Istanbul'
+            }),
             timestamp: Date.now()
         };
         
@@ -574,7 +633,12 @@ io.on('connection', (socket) => {
             reactions: [],
             isSecure: isSecure || false,
             secureId: secureId || null,
-            time: new Date().toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' }),
+            time: new Date().toLocaleTimeString('tr-TR', { 
+                hour: '2-digit', 
+                minute: '2-digit',
+                hour12: false,
+                timeZone: 'Europe/Istanbul'
+            }),
             timestamp: Date.now()
         };
         
@@ -960,7 +1024,12 @@ io.on('connection', (socket) => {
             stickerId,
             stickerUrl: imageUrl,
             reactions: [],
-            time: new Date().toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' }),
+            time: new Date().toLocaleTimeString('tr-TR', { 
+                hour: '2-digit', 
+                minute: '2-digit',
+                hour12: false,
+                timeZone: 'Europe/Istanbul'
+            }),
             timestamp: Date.now()
         };
         
@@ -1041,12 +1110,15 @@ app.post('/api/upload-chunk', express.json({ limit: '10mb' }), async (req, res) 
             return res.status(400).json({ error: 'Eksik parametreler' });
         }
         
-        let upload = uploadChunks.get(uploadId);
+        let session = uploadSessions.get(uploadId);
         
-        if (!upload) {
-            upload = {
-                chunks: new Array(parseInt(totalChunks)),
+        if (!session) {
+            const tempFilePath = path.join(TEMP_UPLOAD_DIR, `${uploadId}_${Date.now()}.tmp`);
+            
+            session = {
+                tempFilePath,
                 totalChunks: parseInt(totalChunks),
+                receivedChunks: new Set(),
                 fileName,
                 mimeType,
                 title: title || fileName,
@@ -1055,27 +1127,40 @@ app.post('/api/upload-chunk', express.json({ limit: '10mb' }), async (req, res) 
                 roomCode,
                 createdAt: Date.now()
             };
-            uploadChunks.set(uploadId, upload);
+            
+            uploadSessions.set(uploadId, session);
+            
+            fs.writeFileSync(tempFilePath, '');
+            console.log(`📁 Geçici dosya oluşturuldu: ${tempFilePath}`);
         }
         
         const chunkBuffer = Buffer.from(chunkData, 'base64');
-        upload.chunks[parseInt(chunkIndex)] = chunkBuffer;
         
-        const receivedChunks = upload.chunks.filter(c => c !== undefined && c !== null).length;
+        const fd = fs.openSync(session.tempFilePath, 'r+');
+        const position = parseInt(chunkIndex) * 2 * 1024 * 1024;
+        fs.writeSync(fd, chunkBuffer, 0, chunkBuffer.length, position);
+        fs.closeSync(fd);
         
-        if (receivedChunks === upload.totalChunks) {
-            const fullBuffer = Buffer.concat(upload.chunks);
-            
-            let folder = type === 'library' ? '/library_videos' : '/room_videos';
+        session.receivedChunks.add(parseInt(chunkIndex));
+        
+        const receivedCount = session.receivedChunks.size;
+        
+        if (receivedCount === session.totalChunks) {
+            console.log(`✅ Tüm chunk'lar tamamlandı: ${uploadId}, dosya birleştiriliyor...`);
             
             if (type === 'library' && macAddress !== ADMIN_MAC_ADDRESS) {
-                uploadChunks.delete(uploadId);
+                fs.unlinkSync(session.tempFilePath);
+                uploadSessions.delete(uploadId);
                 return res.status(403).json({ error: 'Sadece admin kütüphaneye yükleyebilir' });
             }
             
+            const fileBuffer = fs.readFileSync(session.tempFilePath);
+            
+            const folder = type === 'library' ? '/library_videos' : '/room_videos';
+            
             const result = await new Promise((resolve, reject) => {
                 imagekit.upload({
-                    file: fullBuffer,
+                    file: fileBuffer,
                     fileName: fileName,
                     folder: folder,
                     tags: type === 'library' ? ['library', 'copyright-free', 'admin'] : ['room_video'],
@@ -1093,7 +1178,7 @@ app.post('/api/upload-chunk', express.json({ limit: '10mb' }), async (req, res) 
                 
                 videoLibrary.set(videoId, {
                     id: videoId,
-                    title: upload.title,
+                    title: session.title,
                     url: result.url,
                     fileId: result.fileId,
                     fileName: result.name,
@@ -1103,41 +1188,91 @@ app.post('/api/upload-chunk', express.json({ limit: '10mb' }), async (req, res) 
                     expiresAt: expiresAt,
                     size: result.size
                 });
+                
+                console.log(`📚 Kütüphaneye eklendi: ${session.title}`);
+                
             } else if (type === 'room' && roomCode) {
                 const videoId = 'room_' + Date.now();
                 roomVideos.set(videoId, {
                     id: videoId,
                     url: result.url,
                     fileId: result.fileId,
-                    title: upload.title,
-                    uploadedBy: 'Bekliyor',
+                    title: session.title,
+                    uploadedBy: 'Kullanıcı',
                     uploadedAt: Date.now(),
                     expiresAt: Date.now() + (24 * 60 * 60 * 1000),
                     roomCode: roomCode
                 });
+                
+                console.log(`🎬 Oda videosu yüklendi: ${session.title}`);
             }
             
-            uploadChunks.delete(uploadId);
+            fs.unlinkSync(session.tempFilePath);
+            console.log(`🗑️ Geçici dosya silindi: ${session.tempFilePath}`);
+            
+            uploadSessions.delete(uploadId);
             
             res.json({
                 success: true,
                 done: true,
                 url: result.url,
                 fileId: result.fileId,
-                title: upload.title
+                title: session.title
             });
+            
         } else {
             res.json({
                 success: true,
                 done: false,
-                received: receivedChunks,
-                total: upload.totalChunks
+                received: receivedCount,
+                total: session.totalChunks
             });
         }
+        
     } catch (error) {
         console.error('❌ Chunk yükleme hatası:', error);
+        
+        try {
+            if (uploadId) {
+                const session = uploadSessions.get(uploadId);
+                if (session && session.tempFilePath && fs.existsSync(session.tempFilePath)) {
+                    fs.unlinkSync(session.tempFilePath);
+                }
+                uploadSessions.delete(uploadId);
+            }
+        } catch (e) {}
+        
         res.status(500).json({ error: error.message });
     }
+});
+
+app.get('/api/upload-status/:uploadId', (req, res) => {
+    const { uploadId } = req.params;
+    const session = uploadSessions.get(uploadId);
+    
+    if (!session) {
+        return res.status(404).json({ error: 'Yükleme bulunamadı' });
+    }
+    
+    res.json({
+        uploadId,
+        received: session.receivedChunks.size,
+        total: session.totalChunks,
+        percent: Math.round((session.receivedChunks.size / session.totalChunks) * 100)
+    });
+});
+
+app.delete('/api/upload-cancel/:uploadId', (req, res) => {
+    const { uploadId } = req.params;
+    const session = uploadSessions.get(uploadId);
+    
+    if (session && session.tempFilePath && fs.existsSync(session.tempFilePath)) {
+        fs.unlinkSync(session.tempFilePath);
+        console.log(`🗑️ İptal edilen yükleme silindi: ${session.tempFilePath}`);
+    }
+    
+    uploadSessions.delete(uploadId);
+    res.json({ success: true });
 });
 
 app.post('/api/library/upload', upload.single('video'), async (req, res) => {
@@ -1321,7 +1456,6 @@ app.get('*', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
-// 🚀 Server başlat
 server.listen(PORT, '0.0.0.0', () => {
     console.log('\n' + '='.repeat(50));
     console.log(`🚀 SERVER ${PORT} PORTUNDA ÇALIŞIYOR`);
@@ -1330,7 +1464,8 @@ server.listen(PORT, '0.0.0.0', () => {
     console.log(`👑 Admin MAC Address: ${ADMIN_MAC_ADDRESS}`);
     console.log(`📚 Video Kütüphanesi: ${videoLibrary.size} video`);
     console.log(`🔔 Bildirim Sistemi: Aktif`);
-    console.log(`💾 ImageKit: 5GB Destekli (Chunk Upload ile)`);
+    console.log(`💾 ImageKit: 5GB Destekli (Disk tabanlı chunk upload)`);
+    console.log(`📁 Geçici klasör: ${TEMP_UPLOAD_DIR}`);
     console.log(`🧹 Otomatik Temizlik: Her saat`);
     console.log('='.repeat(50));
 });
