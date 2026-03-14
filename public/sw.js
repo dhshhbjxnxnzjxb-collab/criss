@@ -33,8 +33,8 @@ self.addEventListener('push', function(event) {
         vibrate: [200, 100, 200],
         data: data.data || {},
         actions: data.actions || [
-            { action: 'open', title: 'Odaya Git' },
-            { action: 'close', title: 'Kapat' }
+            { action: 'open', title: '🚪 Odaya Git' },
+            { action: 'close', title: '❌ Kapat' }
         ],
         tag: 'birlikte-izle',
         renotify: true,
