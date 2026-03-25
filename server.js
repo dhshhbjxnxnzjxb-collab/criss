@@ -10,9 +10,9 @@ const webpush = require('web-push');
 const fs = require('fs');
 const os = require('os');
 require('dotenv').config();
-
 const axios = require('axios');
-const cheerio = require('cheerio');
+// Anify API base URL
+const ANIFY_API = 'https://api.anify.tv';
 const app = express();
 const server = http.createServer(app);
 const PORT = process.env.PORT || 10000;
@@ -1593,55 +1593,84 @@ async function getEpisodeSourcesGogo(episodeId) {
         let url = '';
         
         // episodeId formatını dene
-        if (episodeId.includes('-episode-')) {
-            const animeId = episodeId.split('-episode-')[0];
-            const episodeNum = episodeId.split('-episode-')[1];
-            url = `https://gogoanime.gg/${animeId}-episode-${episodeNum}`;
-        } else {
-            url = `https://gogoanime.gg/${episodeId}`;
+// ========== ANIME API (ANIFY - EN STABİL) ==========
+// Arama
+async function searchAnime(query) {
+    try {
+        const response = await axios.get(`${ANIFY_API}/search/${encodeURIComponent(query)}`);
+        const results = response.data;
+        
+        return {
+            results: results.map(anime => ({
+                id: anime.id,
+                title: anime.title.romaji || anime.title.english || anime.title.native,
+                image: anime.coverImage || anime.image || 'https://via.placeholder.com/200x280?text=No+Image',
+                rating: anime.averageScore ? (anime.averageScore / 10).toFixed(1) : null,
+                releaseDate: anime.year || null,
+                type: anime.format || 'TV'
+            }))
+        };
+    } catch (error) {
+        console.error('Anify arama hatası:', error.message);
+        return { results: [] };
+    }
+}
+
+// Anime detayları ve bölümler
+async function getAnimeInfo(id) {
+    try {
+        const response = await axios.get(`${ANIFY_API}/info/${id}`);
+        const anime = response.data;
+        
+        const episodes = [];
+        if (anime.episodes) {
+            anime.episodes.forEach(ep => {
+                episodes.push({
+                    id: ep.id,
+                    number: ep.number,
+                    title: ep.title || `Bölüm ${ep.number}`
+                });
+            });
         }
         
-        console.log(`🎬 Video aranıyor: ${url}`);
+        return {
+            id: id,
+            title: anime.title.romaji || anime.title.english || anime.title.native,
+            image: anime.coverImage || anime.image,
+            description: anime.description,
+            episodes: episodes.reverse()
+        };
+    } catch (error) {
+        console.error('Anify detay hatası:', error.message);
+        return { episodes: [] };
+    }
+}
+
+// Video kaynakları
+async function getEpisodeSources(episodeId) {
+    try {
+        const response = await axios.get(`${ANIFY_API}/sources/${episodeId}`);
+        const sources = response.data;
         
-        const { data } = await axios.get(url, {
-            headers: { 'User-Agent': 'Mozilla/5.0' }
-        });
-        
-        // Video URL'lerini bul - farklı pattern'ler
-        let videoUrl = null;
-        
-        // Pattern 1: file: "url"
-        const match1 = data.match(/file:\s*"([^"]+)"/);
-        if (match1) videoUrl = match1[1];
-        
-        // Pattern 2: sources: [{file: "url"}]
-        if (!videoUrl) {
-            const match2 = data.match(/sources:\s*\[\s*{\s*file:\s*"([^"]+)"/);
-            if (match2) videoUrl = match2[1];
-        }
-        
-        // Pattern 3: videoUrl = "..."
-        if (!videoUrl) {
-            const match3 = data.match(/videoUrl\s*=\s*"([^"]+)"/);
-            if (match3) videoUrl = match3[1];
-        }
-        
-        if (videoUrl) {
-            console.log(`✅ Video bulundu: ${videoUrl.substring(0, 50)}...`);
+        if (sources.sources && sources.sources.length > 0) {
+            // Kaliteye göre sırala
+            const sorted = sources.sources.sort((a, b) => {
+                const qualityA = parseInt(a.quality) || 0;
+                const qualityB = parseInt(b.quality) || 0;
+                return qualityB - qualityA;
+            });
+            
             return {
-                sources: [{
-                    url: videoUrl,
-                    quality: 'auto',
-                    isM3U8: videoUrl.includes('.m3u8')
-                }]
+                sources: sorted.map(s => ({
+                    url: s.url,
+                    quality: s.quality || 'auto',
+                    isM3U8: s.url.includes('.m3u8')
+                }))
             };
         }
-        
-        console.log('❌ Video URL bulunamadı');
         return { sources: [] };
-        
     } catch (error) {
-        console.error('Gogoanime video hatası:', error.message);
+        console.error('Anify video hatası:', error.message);
         return { sources: [] };
     }
 }
@@ -1651,7 +1680,7 @@ app.get('/api/anime/search', async (req, res) => {
     try {
         const query = req.query.q;
         if (!query) return res.status(400).json({ error: 'Arama terimi gerekli' });
-        const results = await searchAnimeGogo(query);
+        const results = await searchAnime(query);
         res.json(results);
     } catch (error) {
         console.error('Arama hatası:', error);
@@ -1663,7 +1692,7 @@ app.get('/api/anime/info', async (req, res) => {
     try {
         const id = req.query.id;
         if (!id) return res.status(400).json({ error: 'Anime ID gerekli' });
-        const info = await getAnimeInfoGogo(id);
+        const info = await getAnimeInfo(id);
         res.json(info);
     } catch (error) {
         console.error('Detay hatası:', error);
@@ -1675,7 +1704,7 @@ app.get('/api/anime/watch', async (req, res) => {
     try {
         const episodeId = req.query.episodeId;
         if (!episodeId) return res.status(400).json({ error: 'Bölüm ID gerekli' });
-        const sources = await getEpisodeSourcesGogo(episodeId);
+        const sources = await getEpisodeSources(episodeId);
         
         if (sources.sources && sources.sources.length > 0) {
             res.json({ success: true, sources: sources.sources });
