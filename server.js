@@ -13,8 +13,6 @@ require('dotenv').config();
 
 const axios = require('axios');
 const cheerio = require('cheerio');
-
-console.log('✅ Anime API başlatıldı: Gogoanime');
 const app = express();
 const server = http.createServer(app);
 const PORT = process.env.PORT || 10000;
@@ -1448,29 +1446,53 @@ app.delete('/api/library/:id', async (req, res) => {
     }
 });
 
-// ========== ANIME API (DIRECT SCRAPER) ==========
+// ========== ANIME API (DIRECT SCRAPER - GÜNCELLENMİŞ) ==========
 
-
-// Gogoanime scraper
+// Gogoanime scraper - GÜNCELLENMİŞ
 async function searchAnimeGogo(query) {
     try {
         const url = `https://gogoanime.gg/search.html?keyword=${encodeURIComponent(query)}`;
+        console.log(`🔍 Arama yapılıyor: ${url}`);
+        
         const { data } = await axios.get(url, {
-            headers: { 'User-Agent': 'Mozilla/5.0' }
+            headers: { 
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+            }
         });
+        
         const $ = cheerio.load(data);
         
         const results = [];
-        $('.items .name').each((i, el) => {
+        
+        // Farklı seçicileri dene
+        $('.items .name, .anime_name, .film-detail .name, a.name').each((i, el) => {
             const title = $(el).text().trim();
-            const link = $(el).attr('href');
+            let link = $(el).attr('href');
+            
             if (title && link) {
-                const id = link.replace('/category/', '');
-                const img = $(el).parent().find('img').attr('src') || '';
+                let id = link;
+                if (link.includes('/category/')) {
+                    id = link.replace('/category/', '');
+                } else if (link.includes('/anime/')) {
+                    id = link.replace('/anime/', '');
+                } else {
+                    id = link.split('/').filter(Boolean).pop();
+                }
+                
+                // Resim bulmaya çalış
+                let img = '';
+                const parentImg = $(el).closest('.items').find('img').attr('src');
+                const siblingImg = $(el).parent().find('img').attr('src');
+                img = parentImg || siblingImg || '';
+                
+                if (img && !img.startsWith('http')) {
+                    img = `https://gogoanime.gg${img}`;
+                }
+                
                 results.push({
                     id: id,
                     title: title,
-                    image: img.startsWith('http') ? img : `https://gogoanime.gg${img}`,
+                    image: img || 'https://via.placeholder.com/200x280?text=No+Image',
                     rating: null,
                     releaseDate: null,
                     type: 'TV'
@@ -1478,9 +1500,30 @@ async function searchAnimeGogo(query) {
             }
         });
         
-        return { results: results.slice(0, 20) };
+        // Eğer sonuç yoksa alternatif selector dene
+        if (results.length === 0) {
+            $('a[href*="/category/"]').each((i, el) => {
+                const title = $(el).text().trim();
+                const link = $(el).attr('href');
+                if (title && link && title.length > 0 && title.length < 100) {
+                    const id = link.replace('/category/', '');
+                    results.push({
+                        id: id,
+                        title: title,
+                        image: 'https://via.placeholder.com/200x280?text=No+Image',
+                        rating: null,
+                        releaseDate: null,
+                        type: 'TV'
+                    });
+                }
+            });
+        }
+        
+        console.log(`✅ ${results.length} sonuç bulundu`);
+        return { results: results.slice(0, 30) };
+        
     } catch (error) {
-        console.error('Gogoanime arama hatası:', error);
+        console.error('Gogoanime arama hatası:', error.message);
         return { results: [] };
     }
 }
@@ -1488,65 +1531,117 @@ async function searchAnimeGogo(query) {
 async function getAnimeInfoGogo(id) {
     try {
         const url = `https://gogoanime.gg/category/${id}`;
+        console.log(`📺 Anime detay alınıyor: ${url}`);
+        
         const { data } = await axios.get(url, {
             headers: { 'User-Agent': 'Mozilla/5.0' }
         });
         const $ = cheerio.load(data);
         
-        const title = $('.anime_info_body_bg h1').text().trim();
-        const image = $('.anime_info_body_bg img').attr('src') || '';
+        const title = $('.anime_info_body_bg h1').text().trim() || $('h1').first().text().trim();
+        const image = $('.anime_info_body_bg img').attr('src') || $('img.anime_cover').attr('src') || '';
         
         const episodes = [];
-        $('#episode_page li a').each((i, el) => {
-            const epNum = $(el).attr('ep_end');
-            const epStart = $(el).attr('ep_start');
-            if (epNum) {
+        
+        // Bölümleri bul - farklı seçiciler
+        $('#episode_page li a, .episodes a, .episode-list a').each((i, el) => {
+            const epNum = $(el).attr('ep_end') || $(el).attr('data-number') || $(el).text().match(/\d+/)?.[0];
+            const epHref = $(el).attr('href');
+            if (epNum && epHref) {
+                let epId = epHref.split('/').filter(Boolean).pop();
+                if (!epId) epId = `${id}-episode-${epNum}`;
                 episodes.push({
-                    id: `${id}-episode-${epNum}`,
+                    id: epId,
                     number: epNum,
                     title: `Bölüm ${epNum}`
                 });
             }
         });
         
+        // Eğer bölüm bulunamadıysa, sayfadaki tüm bağlantıları tara
+        if (episodes.length === 0) {
+            $('a[href*="-episode-"]').each((i, el) => {
+                const href = $(el).attr('href');
+                const match = href.match(/-episode-(\d+)/);
+                if (match) {
+                    episodes.push({
+                        id: href.split('/').pop(),
+                        number: match[1],
+                        title: `Bölüm ${match[1]}`
+                    });
+                }
+            });
+        }
+        
+        const finalImage = image.startsWith('http') ? image : `https://gogoanime.gg${image}`;
+        
         return {
             id: id,
-            title: title,
-            image: image.startsWith('http') ? image : `https://gogoanime.gg${image}`,
+            title: title || id,
+            image: finalImage || 'https://via.placeholder.com/200x280?text=No+Image',
             episodes: episodes.reverse()
         };
+        
     } catch (error) {
-        console.error('Gogoanime detay hatası:', error);
+        console.error('Gogoanime detay hatası:', error.message);
         return { episodes: [] };
     }
 }
 
 async function getEpisodeSourcesGogo(episodeId) {
     try {
-        // episodeId format: "naruto-episode-1"
-        const animeId = episodeId.split('-episode-')[0];
-        const episodeNum = episodeId.split('-episode-')[1];
+        let url = '';
         
-        const url = `https://gogoanime.gg/${animeId}-episode-${episodeNum}`;
+        // episodeId formatını dene
+        if (episodeId.includes('-episode-')) {
+            const animeId = episodeId.split('-episode-')[0];
+            const episodeNum = episodeId.split('-episode-')[1];
+            url = `https://gogoanime.gg/${animeId}-episode-${episodeNum}`;
+        } else {
+            url = `https://gogoanime.gg/${episodeId}`;
+        }
+        
+        console.log(`🎬 Video aranıyor: ${url}`);
+        
         const { data } = await axios.get(url, {
             headers: { 'User-Agent': 'Mozilla/5.0' }
         });
         
-        // Video URL'lerini bul
-        const match = data.match(/file:\s*"([^"]+)"/);
-        if (match && match[1]) {
+        // Video URL'lerini bul - farklı pattern'ler
+        let videoUrl = null;
+        
+        // Pattern 1: file: "url"
+        const match1 = data.match(/file:\s*"([^"]+)"/);
+        if (match1) videoUrl = match1[1];
+        
+        // Pattern 2: sources: [{file: "url"}]
+        if (!videoUrl) {
+            const match2 = data.match(/sources:\s*\[\s*{\s*file:\s*"([^"]+)"/);
+            if (match2) videoUrl = match2[1];
+        }
+        
+        // Pattern 3: videoUrl = "..."
+        if (!videoUrl) {
+            const match3 = data.match(/videoUrl\s*=\s*"([^"]+)"/);
+            if (match3) videoUrl = match3[1];
+        }
+        
+        if (videoUrl) {
+            console.log(`✅ Video bulundu: ${videoUrl.substring(0, 50)}...`);
             return {
                 sources: [{
-                    url: match[1],
+                    url: videoUrl,
                     quality: 'auto',
-                    isM3U8: match[1].includes('.m3u8')
+                    isM3U8: videoUrl.includes('.m3u8')
                 }]
             };
         }
         
+        console.log('❌ Video URL bulunamadı');
         return { sources: [] };
+        
     } catch (error) {
-        console.error('Gogoanime video hatası:', error);
+        console.error('Gogoanime video hatası:', error.message);
         return { sources: [] };
     }
 }
