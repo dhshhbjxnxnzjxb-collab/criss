@@ -12,8 +12,18 @@ const os = require('os');
 require('dotenv').config();
 
 // ========== ANIME API ==========
+// ========== ANIME API ==========
 const { ANIME } = require('@consumet/extensions');
-const animeProvider = new ANIME.Gogoanime();
+
+// Yeni sürümde farklı kullanım
+let animeProvider;
+try {
+    // Önce Gogoanime dene
+    animeProvider = ANIME.Gogoanime ? new ANIME.Gogoanime() : new ANIME.AnimePahe();
+} catch (e) {
+    // Alternatif olarak AnimePahe kullan
+    animeProvider = new ANIME.AnimePahe();
+}
 
 const app = express();
 const server = http.createServer(app);
