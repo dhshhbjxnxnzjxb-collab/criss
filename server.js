@@ -13,7 +13,7 @@ require('dotenv').config();
 
 // ========== ANIME API ==========
 const { ANIME } = require('@consumet/extensions');
-const animeProvider = new ANIME.AnimePahe();
+const animeProvider = new ANIME.Gogoanime();
 
 const app = express();
 const server = http.createServer(app);
@@ -1448,7 +1448,11 @@ app.delete('/api/library/:id', async (req, res) => {
     }
 });
 
-// ========== ANIME API ENDPOINTS ==========
+// ========== ANIME API ==========
+const { ANIME } = require('@consumet/extensions');
+// Gogoanime kullan - daha stabil
+const animeProvider = new ANIME.Gogoanime();
+
 app.get('/api/anime/search', async (req, res) => {
     try {
         const query = req.query.q;
@@ -1478,7 +1482,20 @@ app.get('/api/anime/watch', async (req, res) => {
         const episodeId = req.query.episodeId;
         if (!episodeId) return res.status(400).json({ error: 'Bölüm ID gerekli' });
         const sources = await animeProvider.fetchEpisodeSources(episodeId);
-        res.json(sources);
+        
+        // Video URL'lerini doğru formatta döndür
+        if (sources.sources && sources.sources.length > 0) {
+            res.json({ 
+                success: true, 
+                sources: sources.sources.map(s => ({
+                    url: s.url,
+                    quality: s.quality || 'auto',
+                    isM3U8: s.isM3U8 || true
+                }))
+            });
+        } else {
+            res.json({ success: false, error: 'Video kaynağı bulunamadı' });
+        }
     } catch (error) {
         console.error('Anime izleme hatası:', error);
         res.status(500).json({ error: error.message });
