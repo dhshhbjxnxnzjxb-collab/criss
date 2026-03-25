@@ -11,10 +11,8 @@ const fs = require('fs');
 const os = require('os');
 require('dotenv').config();
 
-const { ANIME } = require('@consumet/extensions');
-
-// Gogoanime kullan - EN STABİL
-const animeProvider = new ANIME.Gogoanime();
+const axios = require('axios');
+const cheerio = require('cheerio');
 
 console.log('✅ Anime API başlatıldı: Gogoanime');
 const app = express();
@@ -1450,16 +1448,118 @@ app.delete('/api/library/:id', async (req, res) => {
     }
 });
 
-// ========== ANIME API ==========
+// ========== ANIME API (DIRECT SCRAPER) ==========
 
+
+// Gogoanime scraper
+async function searchAnimeGogo(query) {
+    try {
+        const url = `https://gogoanime.gg/search.html?keyword=${encodeURIComponent(query)}`;
+        const { data } = await axios.get(url, {
+            headers: { 'User-Agent': 'Mozilla/5.0' }
+        });
+        const $ = cheerio.load(data);
+        
+        const results = [];
+        $('.items .name').each((i, el) => {
+            const title = $(el).text().trim();
+            const link = $(el).attr('href');
+            if (title && link) {
+                const id = link.replace('/category/', '');
+                const img = $(el).parent().find('img').attr('src') || '';
+                results.push({
+                    id: id,
+                    title: title,
+                    image: img.startsWith('http') ? img : `https://gogoanime.gg${img}`,
+                    rating: null,
+                    releaseDate: null,
+                    type: 'TV'
+                });
+            }
+        });
+        
+        return { results: results.slice(0, 20) };
+    } catch (error) {
+        console.error('Gogoanime arama hatası:', error);
+        return { results: [] };
+    }
+}
+
+async function getAnimeInfoGogo(id) {
+    try {
+        const url = `https://gogoanime.gg/category/${id}`;
+        const { data } = await axios.get(url, {
+            headers: { 'User-Agent': 'Mozilla/5.0' }
+        });
+        const $ = cheerio.load(data);
+        
+        const title = $('.anime_info_body_bg h1').text().trim();
+        const image = $('.anime_info_body_bg img').attr('src') || '';
+        
+        const episodes = [];
+        $('#episode_page li a').each((i, el) => {
+            const epNum = $(el).attr('ep_end');
+            const epStart = $(el).attr('ep_start');
+            if (epNum) {
+                episodes.push({
+                    id: `${id}-episode-${epNum}`,
+                    number: epNum,
+                    title: `Bölüm ${epNum}`
+                });
+            }
+        });
+        
+        return {
+            id: id,
+            title: title,
+            image: image.startsWith('http') ? image : `https://gogoanime.gg${image}`,
+            episodes: episodes.reverse()
+        };
+    } catch (error) {
+        console.error('Gogoanime detay hatası:', error);
+        return { episodes: [] };
+    }
+}
+
+async function getEpisodeSourcesGogo(episodeId) {
+    try {
+        // episodeId format: "naruto-episode-1"
+        const animeId = episodeId.split('-episode-')[0];
+        const episodeNum = episodeId.split('-episode-')[1];
+        
+        const url = `https://gogoanime.gg/${animeId}-episode-${episodeNum}`;
+        const { data } = await axios.get(url, {
+            headers: { 'User-Agent': 'Mozilla/5.0' }
+        });
+        
+        // Video URL'lerini bul
+        const match = data.match(/file:\s*"([^"]+)"/);
+        if (match && match[1]) {
+            return {
+                sources: [{
+                    url: match[1],
+                    quality: 'auto',
+                    isM3U8: match[1].includes('.m3u8')
+                }]
+            };
+        }
+        
+        return { sources: [] };
+    } catch (error) {
+        console.error('Gogoanime video hatası:', error);
+        return { sources: [] };
+    }
+}
+
+// API Endpoint'leri
 app.get('/api/anime/search', async (req, res) => {
     try {
         const query = req.query.q;
         if (!query) return res.status(400).json({ error: 'Arama terimi gerekli' });
-        const results = await animeProvider.search(query);
+        const results = await searchAnimeGogo(query);
         res.json(results);
     } catch (error) {
-        console.error('Anime arama hatası:', error);
+        console.error('Arama hatası:', error);
         res.status(500).json({ error: error.message });
     }
 });
@@ -1468,10 +1568,10 @@ app.get('/api/anime/info', async (req, res) => {
     try {
         const id = req.query.id;
         if (!id) return res.status(400).json({ error: 'Anime ID gerekli' });
-        const info = await animeProvider.fetchAnimeInfo(id);
+        const info = await getAnimeInfoGogo(id);
         res.json(info);
     } catch (error) {
-        console.error('Anime detay hatası:', error);
+        console.error('Detay hatası:', error);
         res.status(500).json({ error: error.message });
     }
 });
@@ -1480,25 +1580,19 @@ app.get('/api/anime/watch', async (req, res) => {
     try {
         const episodeId = req.query.episodeId;
         if (!episodeId) return res.status(400).json({ error: 'Bölüm ID gerekli' });
-        const sources = await animeProvider.fetchEpisodeSources(episodeId);
+        const sources = await getEpisodeSourcesGogo(episodeId);
         
         if (sources.sources && sources.sources.length > 0) {
-            res.json({ 
-                success: true, 
-                sources: sources.sources.map(s => ({
-                    url: s.url,
-                    quality: s.quality || 'auto',
-                    isM3U8: s.isM3U8 || true
-                }))
-            });
+            res.json({ success: true, sources: sources.sources });
         } else {
             res.json({ success: false, error: 'Video kaynağı bulunamadı' });
         }
     } catch (error) {
-        console.error('Anime izleme hatası:', error);
+        console.error('İzleme hatası:', error);
         res.status(500).json({ error: error.message });
     }
 });
+
 app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
