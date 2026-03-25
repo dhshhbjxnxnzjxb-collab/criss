@@ -1449,10 +1449,6 @@ app.delete('/api/library/:id', async (req, res) => {
 });
 
 // ========== ANIME API ==========
-const { ANIME } = require('@consumet/extensions');
-// Gogoanime kullan - daha stabil
-const animeProvider = new ANIME.Gogoanime();
-
 app.get('/api/anime/search', async (req, res) => {
     try {
         const query = req.query.q;
