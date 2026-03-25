@@ -11,6 +11,10 @@ const fs = require('fs');
 const os = require('os');
 require('dotenv').config();
 
+// ========== ANIME API ==========
+const { ANIME } = require('@consumet/extensions');
+const animeProvider = new ANIME.AnimePahe();
+
 const app = express();
 const server = http.createServer(app);
 const PORT = process.env.PORT || 10000;
@@ -1444,6 +1448,43 @@ app.delete('/api/library/:id', async (req, res) => {
     }
 });
 
+// ========== ANIME API ENDPOINTS ==========
+app.get('/api/anime/search', async (req, res) => {
+    try {
+        const query = req.query.q;
+        if (!query) return res.status(400).json({ error: 'Arama terimi gerekli' });
+        const results = await animeProvider.search(query);
+        res.json(results);
+    } catch (error) {
+        console.error('Anime arama hatası:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+app.get('/api/anime/info', async (req, res) => {
+    try {
+        const id = req.query.id;
+        if (!id) return res.status(400).json({ error: 'Anime ID gerekli' });
+        const info = await animeProvider.fetchAnimeInfo(id);
+        res.json(info);
+    } catch (error) {
+        console.error('Anime detay hatası:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+app.get('/api/anime/watch', async (req, res) => {
+    try {
+        const episodeId = req.query.episodeId;
+        if (!episodeId) return res.status(400).json({ error: 'Bölüm ID gerekli' });
+        const sources = await animeProvider.fetchEpisodeSources(episodeId);
+        res.json(sources);
+    } catch (error) {
+        console.error('Anime izleme hatası:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
 app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
@@ -1456,96 +1497,8 @@ app.get('*', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
-// ========== ANIME API ENDPOINTS ==========
-const { ANIME } = require('@consumet/extensions');
-const animeProvider = new ANIME.AnimePahe();
-
-app.get('/api/anime/search', async (req, res) => {
-  try {
-    const query = req.query.q;
-    if (!query) return res.status(400).json({ error: 'Arama terimi gerekli' });
-    const results = await animeProvider.search(query);
-    res.json(results);
-  } catch (error) {
-    console.error('Anime arama hatası:', error);
-    res.status(500).json({ error: error.message });
-  }
-});
-
-app.get('/api/anime/info', async (req, res) => {
-  try {
-    const id = req.query.id;
-    if (!id) return res.status(400).json({ error: 'Anime ID gerekli' });
-    const info = await animeProvider.fetchAnimeInfo(id);
-    res.json(info);
-  } catch (error) {
-    console.error('Anime detay hatası:', error);
-    res.status(500).json({ error: error.message });
-  }
-});
-
-app.get('/api/anime/watch', async (req, res) => {
-  try {
-    const episodeId = req.query.episodeId;
-    if (!episodeId) return res.status(400).json({ error: 'Bölüm ID gerekli' });
-    const sources = await animeProvider.fetchEpisodeSources(episodeId);
-    res.json(sources);
-  } catch (error) {
-    console.error('Anime izleme hatası:', error);
-    res.status(500).json({ error: error.message });
-  }
-});
-
-// ========== ANIME API ENDPOINTS ==========
-const { ANIME } = require('@consumet/extensions');
-const animeProvider = new ANIME.AnimePahe();
-
-app.get('/api/anime/search', async (req, res) => {
-  try {
-    const query = req.query.q;
-    if (!query) return res.status(400).json({ error: 'Arama terimi gerekli' });
-    const results = await animeProvider.search(query);
-    res.json(results);
-  } catch (error) {
-    console.error('Anime arama hatası:', error);
-    res.status(500).json({ error: error.message });
-  }
-});
-
-app.get('/api/anime/info', async (req, res) => {
-  try {
-    const id = req.query.id;
-    if (!id) return res.status(400).json({ error: 'Anime ID gerekli' });
-    const info = await animeProvider.fetchAnimeInfo(id);
-    res.json(info);
-  } catch (error) {
-    console.error('Anime detay hatası:', error);
-    res.status(500).json({ error: error.message });
-  }
-});
-
-app.get('/api/anime/watch', async (req, res) => {
-  try {
-    const episodeId = req.query.episodeId;
-    if (!episodeId) return res.status(400).json({ error: 'Bölüm ID gerekli' });
-    const sources = await animeProvider.fetchEpisodeSources(episodeId);
-    res.json(sources);
-  } catch (error) {
-    console.error('Anime izleme hatası:', error);
-    res.status(500).json({ error: error.message });
-  }
-});
-
 server.listen(PORT, '0.0.0.0', () => {
-    console.log('\n' + '='.repeat(50));
-    console.log(`🚀 SERVER ${PORT} PORTUNDA ÇALIŞIYOR`);
-    console.log('='.repeat(50));
-    console.log(`📱 Birlikte İzle Platformu v5.0`);
-    console.log(`👑 Admin MAC Address: ${ADMIN_MAC_ADDRESS}`);
-    console.log(`📚 Video Kütüphanesi: ${videoLibrary.size} video`);
-    console.log(`🔔 Bildirim Sistemi: Aktif`);
-    console.log(`💾 ImageKit: 5GB Destekli (Disk tabanlı chunk upload)`);
-    console.log(`📁 Geçici klasör: ${TEMP_UPLOAD_DIR}`);
-    console.log(`🧹 Otomatik Temizlik: Her saat`);
-    console.log('='.repeat(50));
+    console.log(`🚀 Server ${PORT} portunda çalışıyor`);
+    console.log(`👑 Admin MAC: ${ADMIN_MAC_ADDRESS}`);
+    console.log(`🎬 Anime API aktif`);
 });
