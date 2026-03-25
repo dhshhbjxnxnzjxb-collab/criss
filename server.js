@@ -11,20 +11,12 @@ const fs = require('fs');
 const os = require('os');
 require('dotenv').config();
 
-// ========== ANIME API ==========
-// ========== ANIME API ==========
 const { ANIME } = require('@consumet/extensions');
 
-// Yeni sürümde farklı kullanım
-let animeProvider;
-try {
-    // Önce Gogoanime dene
-    animeProvider = ANIME.Gogoanime ? new ANIME.Gogoanime() : new ANIME.AnimePahe();
-} catch (e) {
-    // Alternatif olarak AnimePahe kullan
-    animeProvider = new ANIME.AnimePahe();
-}
+// Gogoanime kullan - EN STABİL
+const animeProvider = new ANIME.Gogoanime();
 
+console.log('✅ Anime API başlatıldı: Gogoanime');
 const app = express();
 const server = http.createServer(app);
 const PORT = process.env.PORT || 10000;
@@ -1459,6 +1451,7 @@ app.delete('/api/library/:id', async (req, res) => {
 });
 
 // ========== ANIME API ==========
+
 app.get('/api/anime/search', async (req, res) => {
     try {
         const query = req.query.q;
@@ -1489,7 +1482,6 @@ app.get('/api/anime/watch', async (req, res) => {
         if (!episodeId) return res.status(400).json({ error: 'Bölüm ID gerekli' });
         const sources = await animeProvider.fetchEpisodeSources(episodeId);
         
-        // Video URL'lerini doğru formatta döndür
         if (sources.sources && sources.sources.length > 0) {
             res.json({ 
                 success: true, 
@@ -1507,7 +1499,6 @@ app.get('/api/anime/watch', async (req, res) => {
         res.status(500).json({ error: error.message });
     }
 });
-
 app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
